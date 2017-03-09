@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -e
+
+make clean
+make
+
+lib=../../../esp8266/tools/sdk/lib
+
+for i in liblwip_gcc.a liblwip.a liblwip_536.a; do 
+    test -f $lib/${i}.orig || mv $lib/${i} $lib/${i}.orig
+done
+
+ln -sf `pwd`/liblwip_src.a $lib/liblwip_gcc.a

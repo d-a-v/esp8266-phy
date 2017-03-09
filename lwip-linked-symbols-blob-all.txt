@@ -1,0 +1,143 @@
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libpp.a(pp.o): In function `ppRecycleRxPkt':
+(.irom0.text+0xaca): undefined reference to `pbuf_free'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libpp.a(wdev.o): In function `wDev_SetMacAddress':
+(.irom0.text+0x524): undefined reference to `ethbroadcast'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_hostap.o):(.irom0.text+0x732): undefined reference to `pbuf_alloc'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_hostap.o): In function `hostap_input':
+(.irom0.text+0xc41): undefined reference to `pbuf_alloc'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_hostap.o): In function `hostap_input':
+(.irom0.text+0xc77): undefined reference to `pbuf_free'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_hostap.o): In function `hostap_input':
+(.irom0.text+0x1704): undefined reference to `netif_set_up'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_hostap.o): In function `hostap_input':
+(.irom0.text+0x1708): undefined reference to `netif_set_default'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_hostap.o): In function `hostap_input':
+(.irom0.text+0x1821): undefined reference to `netif_set_up'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_hostap.o): In function `hostap_input':
+(.irom0.text+0x1829): undefined reference to `netif_set_default'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_hostap.o): In function `hostap_input':
+(.irom0.text+0x1894): undefined reference to `netif_set_down'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_hostap.o): In function `hostap_input':
+(.irom0.text+0x191d): undefined reference to `netif_set_down'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(wl_cnx.o): In function `cnx_remove_rc':
+(.irom0.text+0x1070): undefined reference to `dhcp_release'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(wl_cnx.o): In function `cnx_remove_rc':
+(.irom0.text+0x1074): undefined reference to `dhcp_stop'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(wl_cnx.o): In function `cnx_rc_update_rssi':
+(.irom0.text+0x1078): undefined reference to `dhcp_cleanup'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(wl_cnx.o): In function `cnx_rc_update_rssi':
+(.irom0.text+0x10b4): undefined reference to `netif_set_down'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(wl_cnx.o): In function `cnx_rc_update_rssi':
+(.irom0.text+0x10c2): undefined reference to `dhcp_release'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(wl_cnx.o): In function `cnx_rc_update_rssi':
+(.irom0.text+0x10ca): undefined reference to `dhcp_stop'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(wl_cnx.o): In function `cnx_rc_update_rssi':
+(.irom0.text+0x10d2): undefined reference to `dhcp_cleanup'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(app_main.o): In function `user_uart_wait_tx_fifo_empty':
+(.irom0.text+0x678): undefined reference to `sys_check_timeouts'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(app_main.o): In function `user_uart_wait_tx_fifo_empty':
+(.irom0.text+0x6b4): undefined reference to `lwip_init'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(app_main.o): In function `user_uart_wait_tx_fifo_empty':
+(.irom0.text+0x6b8): undefined reference to `espconn_init'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(app_main.o): In function `user_rf_pre_init':
+(.irom0.text+0x740): undefined reference to `lwip_init'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(app_main.o): In function `flash_data_check':
+(.irom0.text+0x746): undefined reference to `espconn_init'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(app_main.o): In function `flash_data_check':
+(.irom0.text+0xaca): undefined reference to `netif_set_default'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o):(.irom0.text+0x2b): undefined reference to `pbuf_free'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o):(.irom0.text+0x67): undefined reference to `pbuf_free'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o):(.irom0.text+0x9c): undefined reference to `etharp_output'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o):(.irom0.text+0xac): undefined reference to `ethernet_input'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o):(.irom0.text+0xc8): undefined reference to `netif_add'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o):(.irom0.text+0xcc): undefined reference to `dhcps_start'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o): In function `eagle_lwip_if_alloc':
+(.irom0.text+0x17d): undefined reference to `netif_set_addr'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o): In function `eagle_lwip_if_alloc':
+(.irom0.text+0x1c1): undefined reference to `netif_add'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o): In function `eagle_lwip_if_alloc':
+(.irom0.text+0x1d2): undefined reference to `dhcps_start'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o): In function `eagle_lwip_if_alloc':
+(.irom0.text+0x28c): undefined reference to `netif_add'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o): In function `eagle_lwip_if_alloc':
+(.irom0.text+0x298): undefined reference to `netif_remove'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o): In function `eagle_lwip_if_alloc':
+(.irom0.text+0x29c): undefined reference to `dhcps_stop'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o): In function `eagle_lwip_if_alloc':
+(.irom0.text+0x2b0): undefined reference to `netif_remove'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o): In function `eagle_lwip_if_alloc':
+(.irom0.text+0x2dc): undefined reference to `dhcps_stop'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(eagle_lwip_if.o): In function `eagle_lwip_if_alloc':
+(.irom0.text+0x2e4): undefined reference to `netif_remove'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `system_station_got_ip_set':
+(.irom0.text+0x10a8): undefined reference to `dhcps_start'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `system_station_got_ip_set':
+(.irom0.text+0x10ec): undefined reference to `dhcps_stop'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `system_print_meminfo':
+(.irom0.text+0x1154): undefined reference to `dhcp_start'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `system_get_chip_id':
+(.irom0.text+0x1190): undefined reference to `dhcp_stop'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `system_get_rtc_time':
+(.irom0.text+0x11c8): undefined reference to `dhcp_stop'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `system_get_rtc_time':
+(.irom0.text+0x11d0): undefined reference to `dhcp_cleanup'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `system_get_string_from_flash':
+(.irom0.text+0x1335): undefined reference to `netif_set_default'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `system_get_string_from_flash':
+(.irom0.text+0x1348): undefined reference to `netif_default'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `wifi_softap_dhcps_start':
+(.irom0.text+0x13ca): undefined reference to `netif_set_default'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `wifi_softap_dhcps_stop':
+(.irom0.text+0x13fd): undefined reference to `netif_set_default'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `wifi_softap_get_config_default':
+(.irom0.text+0x30a9): undefined reference to `netif_set_default'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `wifi_softap_get_config_default':
+(.irom0.text+0x3169): undefined reference to `netif_set_default'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libmain.a(user_interface.o): In function `wifi_unregister_user_ie_manufacturer_recv_cb':
+(.irom0.text+0x37b8): undefined reference to `netif_set_addr'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_output.o): In function `ieee80211_output_pbuf':
+(.irom0.text+0xa9): undefined reference to `pbuf_free'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_output.o): In function `ieee80211_output_pbuf':
+(.irom0.text+0x216): undefined reference to `pbuf_ref'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps.o): In function `show_buf':
+(.irom0.text+0x128): undefined reference to `pbuf_alloc'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps_registrar.o): In function `wps_registrar_pbc_overlap':
+(.irom0.text+0x858): undefined reference to `sys_untimeout'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps_registrar.o): In function `wps_authorized_macs':
+(.irom0.text+0x86f): undefined reference to `sys_untimeout'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps_registrar.o): In function `wps_authorized_macs':
+(.irom0.text+0x87a): undefined reference to `sys_untimeout'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps_registrar.o): In function `wps_registrar_invalidate_pin':
+(.irom0.text+0xc6c): undefined reference to `sys_timeout'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps_registrar.o): In function `wps_registrar_invalidate_pin':
+(.irom0.text+0xccf): undefined reference to `sys_untimeout'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps_registrar.o): In function `wps_registrar_invalidate_pin':
+(.irom0.text+0xcdc): undefined reference to `sys_untimeout'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps_registrar.o): In function `wps_registrar_invalidate_pin':
+(.irom0.text+0xce9): undefined reference to `sys_timeout'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps_registrar.o): In function `wps_registrar_invalidate_pin':
+(.irom0.text+0xd0a): undefined reference to `sys_untimeout'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwps.a(wps_registrar.o): In function `wps_registrar_unlock_pin':
+(.irom0.text+0xda5): undefined reference to `sys_untimeout'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_input.o): In function `ieee80211_deliver_data':
+(.irom0.text+0x23): undefined reference to `pbuf_alloc'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_power.o): In function `ieee80211_pwrsave':
+(.irom0.text+0x89): undefined reference to `pbuf_free'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_power.o): In function `pwrsave_flushq':
+(.irom0.text+0x11b): undefined reference to `pbuf_free'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libnet80211.a(ieee80211_power.o): In function `pwrsave_flushq':
+(.irom0.text+0x145): undefined reference to `pbuf_free'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwpa.a(wpa_auth.o): In function `__wpa_send_eapol':
+(.irom0.text+0xca6): undefined reference to `pbuf_alloc'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwpa.a(wpa_main.o): In function `wpa_config_bss':
+(.irom0.text+0x248): undefined reference to `dhcp_start'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwpa.a(wpa_main.o): In function `wpa_config_bss':
+(.irom0.text+0x24c): undefined reference to `netif_set_addr'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwpa.a(wpa_main.o): In function `eagle_auth_done':
+(.irom0.text+0x385): undefined reference to `dhcp_start'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwpa.a(wpa_main.o): In function `eagle_auth_done':
+(.irom0.text+0x3b1): undefined reference to `netif_set_addr'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwpa.a(wpa_main.o): In function `eagle_auth_done':
+(.irom0.text+0x3b9): undefined reference to `netif_set_up'
+/Applications/Arduino.app/Contents/Java/hardware/esp8266com/esp8266/tools/sdk/lib/libwpa.a(wpas_glue.o): In function `wpa_sm_alloc_eapol':
+(.irom0.text+0x88): undefined reference to `pbuf_alloc'
