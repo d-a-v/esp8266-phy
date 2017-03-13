@@ -1,4 +1,5 @@
 
+#include "osapi.h"
 #include "lwip-stubbed-symbols.h"
 
 /**

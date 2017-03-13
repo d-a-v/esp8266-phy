@@ -4,9 +4,11 @@ SDK_PATH ?= $(abspath ../esp8266/tools/sdk)
 ORG_LWIP ?= $(SDK_PATH)/lwip
 
 BUILD_PATH = build
-LWIP_SRCS = $(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard lwip-stub/*.c))
+LWIP_SRCS = \
+	$(patsubst %.c,$(BUILD_PATH)/%.o,lwip-stub/old-lwip-stub.c) \
+#	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard lwip-stub/*.c))
 
-LWIP_INCLUDE = -Ibuild -I$(SDK_PATH)/include -I$(ORG_LWIP)/include
+LWIP_INCLUDE = -Ibuild -I$(SDK_PATH)/include -I$(ORG_LWIP)/include -Ilwip-stub
 BUILD_FLAGS = -Wall -Wextra -c -Os -g -Wpointer-arith -Wno-implicit-function-declaration -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
 BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC
 

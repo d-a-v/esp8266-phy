@@ -7,7 +7,10 @@
 #include "netif/etharp.h"
 #include "lwip/mem.h"
 
-#define STUB(x) do { os_printf("STUB: " #x "\n"); } while (0)
+#include "glue-stub.h"
+#include "bufprint.h"
+
+#define STUB(x) do { bufprint("STUB: " #x "\n"); } while (0)
 
 const struct eth_addr ethbroadcast = {{0xff,0xff,0xff,0xff,0xff,0xff}};
 struct netif *netif_default;
@@ -25,16 +28,95 @@ struct netif *netif_default;
 #define EP_OFFSET 36
 
 ///////////////////////////////////////
+// call stats
+
+/// REMOVE CALL STAT WHEN BUFPRINT IS OK
+
+
+typedef enum call_stat_e
+{
+	CS_NETIF_ADD = 0,
+	CS_NETIF_REMOVE = 1,
+	CS_NETIF_SET_DEFAULT = 2,
+	CS_NETIF_SET_UP = 3,
+	CS_NETIF_SET_ADDR = 3,
+} call_stat_t;
+
+const char* call_stat_names [] =
+{
+	"netif_add",
+	"netif_remove",
+	"netif_set_default",
+	"netif_set_up",
+	"netif_set_addr",
+};
+
+#define CS_NUMBER (sizeof call_stat_names / sizeof call_stat_names[0])
+
+int call_stats [CS_NUMBER];
+
+void call_stat_init ()
+{
+	os_memset(call_stats, 0, sizeof call_stats);
+}
+
+void call_stat_print ()
+{
+	bufprint("call stats:");
+	for (size_t i = 0; i < CS_NUMBER; i++)
+		bufprint("  %s: %d", call_stat_names[i], call_stats[i]);
+	bufprint("\n");
+}
+
+///////////////////////////////////////
+// glue converters
+
+err_t glue2old_err (err_glue_t err)
+{
+	switch (err)
+	{
+	case GLUE_ERR_OK         : return ERR_OK;
+	case GLUE_ERR_MEM        : return ERR_MEM;
+	case GLUE_ERR_BUF        : return ERR_BUF;
+	case GLUE_ERR_TIMEOUT    : return ERR_TIMEOUT;
+	case GLUE_ERR_RTE        : return ERR_RTE;
+	case GLUE_ERR_INPROGRESS : return ERR_INPROGRESS;
+	case GLUE_ERR_VAL        : return ERR_VAL;
+	case GLUE_ERR_WOULDBLOCK : return ERR_WOULDBLOCK;
+	case GLUE_ERR_ABRT       : return ERR_ABRT;
+	case GLUE_ERR_RST        : return ERR_RST;
+	case GLUE_ERR_CLSD       : return ERR_CLSD;
+	case GLUE_ERR_CONN       : return ERR_CONN;
+	case GLUE_ERR_ARG        : return ERR_ARG;
+	case GLUE_ERR_USE        : return ERR_USE;
+	case GLUE_ERR_IF         : return ERR_IF;
+	case GLUE_ERR_ISCONN     : return ERR_ISCONN;
+
+	/* old does not have: */
+	case GLUE_ERR_ALREADY    : return ERR_ABRT;
+
+	default: return ERR_ABRT;
+	}
+};
+
+struct netif_glue* old2glue_netif (struct netif* old)
+{
+	// so far: do nothing for netif
+	(void)old;
+	return &netif_glue_global;
+}
+
+///////////////////////////////////////
 // helpers
 
 void stub_display_ip (const char* pre, ip_addr_t ip)
 {
-	os_printf("%s%d.%d.%d.%d",
+	bufprint("%s%d.%d.%d.%d",
 		pre,
-		ip.addr >> 24,
-		(ip.addr >> 16) & 0xff,
-		(ip.addr >> 8) & 0xff,
-		ip.addr & 0xff);
+		(int)(ip.addr >> 24),
+		(int)((ip.addr >> 16) & 0xff),
+		(int)((ip.addr >> 8) & 0xff),
+		(int)(ip.addr & 0xff));
 }
 
 void stub_display_ip_info (struct ip_info* i)
@@ -46,7 +128,7 @@ void stub_display_ip_info (struct ip_info* i)
 
 void stub_display_netif_flags (int flags)
 {
-	#define IFF(x)	os_printf("|%s" #x, (flags & NETIF_FLAG_##x)? "!": "")
+	#define IFF(x)	bufprint("|%s" #x, (flags & NETIF_FLAG_##x)? "!": "")
 	IFF(UP);
 	IFF(BROADCAST);
 	IFF(POINTTOPOINT);
@@ -58,27 +140,26 @@ void stub_display_netif_flags (int flags)
 	#undef IFF
 }
 
-void stub_display_netif (const char* pre, struct netif* netif)
+void stub_display_netif (struct netif* netif)
 {
-	os_printf("%s@%p name=%c%c idx=%d mtu=%d flags=",
-		pre,
+	bufprint("@%p name=%c%c idx=%d mtu=%d input=%p output=%p flags=",
 		netif,
 		netif->name[0], netif->name[1],
 		netif->num,
-		netif->mtu);
+		netif->mtu,
+		netif->input,
+		netif->output);
 	stub_display_netif_flags(netif->flags);
 }
 
 ///////////////////////////////////////
 
-
-
 void dhcps_start (struct ip_info *info)
 {
 	//STUB(dhcps_start);
-	os_printf("STUB: dhcps_start ");
+	bufprint("STUB: dhcps_start ");
 	stub_display_ip_info(info);
-	os_printf("\n");
+	bufprint("\n");
 }
 
 void dhcps_stop (void)
@@ -94,11 +175,13 @@ void espconn_init (void)
 void dhcp_cleanup(struct netif *netif)
 {
 	STUB(dhcp_cleanup);
+	stub_display_netif(netif);
 }
 
 err_t dhcp_release(struct netif *netif)
 {
 	STUB(dhcp_release);
+	stub_display_netif(netif);
 	return ERR_ABRT;
 }
 
@@ -116,15 +199,20 @@ err_t dhcp_release(struct netif *netif)
  */
 err_t dhcp_start (struct netif* netif)
 {
+	bufprint_allow = 1;
+	
 	//STUB(dhcp_start);
-	os_printf("STUB: dhcp_start (");
-	stub_display_ip("netif: ip=", netif->ip_addr);
-	stub_display_ip(" mask=", netif->netmask);
-	stub_display_ip(" gw=", netif->gw);
-	stub_display_netif(" ", netif);
-	os_printf(")\n");
-	// there are really no interesting data to translate
-	// STUB: dhcp_start (netif: ip=4.18.15.0 mask=0.60.0.60 gw=0.0.0.1 @0x3ffeffac name=ew idx=0 mtu=0 flags=|UP|BROADCAST|POINTTOPOINT|DHCP|LINK_UP|ETHARP|ETHERNET|IGMP)
+	call_stat_print();
+
+	bufprint("STUB: dhcp_start (");
+	stub_display_netif(netif);
+	bufprint(")\n");
+
+	// important data to translate:
+	// input: esp calls it when a packet is received
+	// output: to be called by lwip when a packet is to be sent
+
+	return glue2old_err(glue_oldcall_dhcp_start(old2glue_netif(netif)));
 	
 	return ERR_ABRT;
 }
@@ -132,13 +220,16 @@ err_t dhcp_start (struct netif* netif)
 void dhcp_stop(struct netif *netif)
 {
 	STUB(dhcp_stop);
+	stub_display_netif(netif);
 }
 
 /**
  * Perform Sanity check of user-configurable values, and initialize all modules.
  */
-void lwip_init(void)
+void lwip_init (void)
 {
+	call_stat_init();
+	
 	STUB(lwip_init);
 }
 
@@ -156,9 +247,19 @@ void lwip_init(void)
  *
  * @return netif, or NULL if failed.
  */
-struct netif* netif_add(struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw, void *state, netif_init_fn init, netif_input_fn input)
+struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw, void *state, netif_init_fn init, netif_input_fn input)
 {
+	call_stats[CS_NETIF_ADD]++;
 	STUB(netif_add);
+
+	stub_display_ip("ip=", *ipaddr);
+	stub_display_ip("mask=", *netmask);
+	stub_display_ip("gw=", *gw);
+	bufprint("state=%p init=%p input=%p ", state, init, input);
+	stub_display_netif(netif);
+	
+	//return glue2old_netif(glue_oldcall_netif_add());
+	
 	return NULL;
 }
 
@@ -167,9 +268,11 @@ struct netif* netif_add(struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netma
  *
  * @param netif the network interface to remove
  */
-void netif_remove(struct netif *netif)
+void netif_remove (struct netif *netif)
 {
+	call_stats[CS_NETIF_REMOVE]++;
 	STUB(netif_remove);
+	stub_display_netif(netif);
 }
 
 /**
@@ -181,9 +284,12 @@ void netif_remove(struct netif *netif)
  * @param netmask the new netmask
  * @param gw the new default gateway
  */
-void netif_set_addr(struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw)
+void netif_set_addr (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw)
 {
+(void)ipaddr; (void)netmask; (void)gw;
+	call_stats[CS_NETIF_SET_ADDR]++;
 	STUB(netif_set_addr);
+	stub_display_netif(netif);
 }
 
 /**
@@ -192,9 +298,11 @@ void netif_set_addr(struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, 
  *
  * @param netif the default network interface
  */
-void netif_set_default(struct netif *netif)
+void netif_set_default (struct netif *netif)
 {
+	call_stats[CS_NETIF_SET_DEFAULT]++;
 	STUB(netif_set_default);
+	stub_display_netif(netif);
 }
 
 /**
@@ -208,6 +316,7 @@ void netif_set_default(struct netif *netif)
 void netif_set_down(struct netif *netif)
 {
 	STUB(netif_set_down);
+	stub_display_netif(netif);
 }
 
 /**
@@ -221,7 +330,9 @@ void netif_set_down(struct netif *netif)
  */ 
 void netif_set_up(struct netif *netif)
 {
+	call_stats[CS_NETIF_SET_UP]++;
 	STUB(netif_set_up);
+	stub_display_netif(netif);
 }
 
 
@@ -262,7 +373,7 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 	// copy parts of original code matching specific requests
 
 	//STUB(pbuf_alloc);
-	os_printf("STUB: pbuf_alloc layer=%s(%d) len=%d type=%s(%d)"
+	bufprint("STUB: pbuf_alloc layer=%s(%d) len=%d type=%s(%d)"
 		"\n",
 		layer==PBUF_TRANSPORT? "transport":
 		layer==PBUF_IP? "ip":
@@ -298,12 +409,12 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 		/* set flags */
 		p->flags = 0;
 		
-		os_printf("STUB: ret 0x%p (%d bytes)\n", p, alloclen);
+		bufprint("STUB: ret 0x%p (%d bytes)\n", p, alloclen);
 		
 		return p;
 	}
 
-	os_printf("STUB: pbuf_alloc BAD CASE\n");
+	bufprint("STUB: pbuf_alloc BAD CASE\n");
 		
 	return NULL;
 }
@@ -344,7 +455,7 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 u8_t pbuf_free(struct pbuf *p)
 {
 	//STUB(pbuf_free);
-	os_printf("STUB: pbuf_free(%p) ref=%d\n", p, p->ref);
+	bufprint("STUB: pbuf_free(%p) ref=%d\n", p, p->ref);
 	
 	#if LWIP_SUPPORT_CUSTOM_PBUF
 	#error LWIP_SUPPORT_CUSTOM_PBUF is defined
@@ -356,7 +467,7 @@ u8_t pbuf_free(struct pbuf *p)
 		return 1;
 	}
 
-	os_printf("STUB: pbuf_free BAD CASE\n");
+	bufprint("STUB: pbuf_free BAD CASE\n");
 	return 0;
 }
 
@@ -368,6 +479,7 @@ u8_t pbuf_free(struct pbuf *p)
  */
 void pbuf_ref(struct pbuf *p)
 {
+(void)p;
 	STUB(pbuf_ref);
 }
 
@@ -380,24 +492,12 @@ void pbuf_ref(struct pbuf *p)
  */
 void sys_check_timeouts(void)
 {
-#if 1
 	static uint8_t r = 0;
 	if ((++r & 63) == 0)
 	{
 		r = 0;
-		os_printf(".");
+		bufprint(".");
 	}
-#else
-	static const char* p = "-\\|/";
-	static uint8_t q = 0;
-	static uint8_t r = 0;
-	if ((++r & 15) == 0)
-	{
-		r = 0;
-		q = (q + 1) & 3;
-		os_printf("%c\b", p[q]);
-	}
-#endif
 }
 
 /**
@@ -412,6 +512,7 @@ void sys_check_timeouts(void)
  */
 void sys_timeout(u32_t msecs, sys_timeout_handler handler, void *arg)
 {
+(void)msecs; (void)handler; (void)arg;
 	STUB(sys_timeout);
 }
 
@@ -427,6 +528,7 @@ void sys_timeout(u32_t msecs, sys_timeout_handler handler, void *arg)
 */
 void sys_untimeout(sys_timeout_handler handler, void *arg)
 {
+(void)handler; (void)arg;
 	STUB(sys_untimeout);
 }
 
@@ -450,6 +552,7 @@ void sys_untimeout(sys_timeout_handler handler, void *arg)
  */
 err_t etharp_output(struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
 {
+(void)netif; (void)q; (void)ipaddr;
 	STUB(etharp_output);
 	return ERR_ABRT;
 }
@@ -464,6 +567,7 @@ err_t etharp_output(struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
  */
 err_t ethernet_input(struct pbuf *p, struct netif *netif)
 {
+(void)p; (void)netif;
 	STUB(ethernet_input);
 	return ERR_ABRT;
 }

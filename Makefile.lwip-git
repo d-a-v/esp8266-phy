@@ -8,6 +8,7 @@ TOOLS_PATH ?= $(ESP8266)/tools/xtensa-lx106-elf/bin/xtensa-lx106-elf-
 LWIP_LIB ?= ../../liblwip_src.a
 SDK_PATH ?= $(abspath $(ESP8266)/tools/sdk)
 
+BUILD_PATH_STUB = ../lwip-stub
 BUILD_PATH = build
 LWIP_SRCS = \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard netif/ethernet.c)) \
@@ -15,6 +16,8 @@ LWIP_SRCS = \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard core/ipv4/*.c)) \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard core/ipv6/*.c)) \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard api/*.c)) \
+	$(patsubst %.c,$(BUILD_PATH)/%.o,../../lwip-stub/new-lwip-stub.c) \
+	$(patsubst %.c,$(BUILD_PATH)/%.o,../../lwip-stub/bufprint.c) \
 
 LWIP_INCLUDE = -Ibuild -I$(SDK_PATH)/include -Iinclude -I../../lwip-git-config
 BUILD_FLAGS = -Wall -Wextra -c -Os -g -Wpointer-arith -Wno-implicit-function-declaration -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
@@ -43,4 +46,4 @@ jall: $(LWIP_LIB)
 #	cp -f $(LWIP_LIB) $(SDK_PATH)/lib/liblwip_gcc.a
 
 jclean:
-	@rm -rf $(BUILD_PATH) $(LWIP_LIB)
+	@rm -rf $(BUILD_PATH) $(LWIP_LIB) $(BUILD_PATH_STUB)

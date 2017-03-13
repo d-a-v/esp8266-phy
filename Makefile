@@ -7,9 +7,11 @@ all clean:
 	make -f Makefile.lwip-stub $@
 	make -f Makefile.lwip-git $@
 
-try install release: all
+install release: all
 	test -f $(LWIP_LIB_RELEASE).orig || cp $(LWIP_LIB_RELEASE) $(LWIP_LIB_RELEASE).orig
 	cp -f $(LWIP_LIB) $(LWIP_LIB_RELEASE)
+
+try: all install
 
 revert:
 	cp $(LWIP_LIB_RELEASE).orig $(LWIP_LIB_RELEASE)
