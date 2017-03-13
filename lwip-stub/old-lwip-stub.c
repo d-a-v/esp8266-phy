@@ -28,47 +28,6 @@ struct netif *netif_default;
 #define EP_OFFSET 36
 
 ///////////////////////////////////////
-// call stats
-
-/// REMOVE CALL STAT WHEN BUFPRINT IS OK
-
-
-typedef enum call_stat_e
-{
-	CS_NETIF_ADD = 0,
-	CS_NETIF_REMOVE = 1,
-	CS_NETIF_SET_DEFAULT = 2,
-	CS_NETIF_SET_UP = 3,
-	CS_NETIF_SET_ADDR = 3,
-} call_stat_t;
-
-const char* call_stat_names [] =
-{
-	"netif_add",
-	"netif_remove",
-	"netif_set_default",
-	"netif_set_up",
-	"netif_set_addr",
-};
-
-#define CS_NUMBER (sizeof call_stat_names / sizeof call_stat_names[0])
-
-int call_stats [CS_NUMBER];
-
-void call_stat_init ()
-{
-	os_memset(call_stats, 0, sizeof call_stats);
-}
-
-void call_stat_print ()
-{
-	bufprint("call stats:");
-	for (size_t i = 0; i < CS_NUMBER; i++)
-		bufprint("  %s: %d", call_stat_names[i], call_stats[i]);
-	bufprint("\n");
-}
-
-///////////////////////////////////////
 // glue converters
 
 err_t glue2old_err (err_glue_t err)
@@ -128,7 +87,7 @@ void stub_display_ip_info (struct ip_info* i)
 
 void stub_display_netif_flags (int flags)
 {
-	#define IFF(x)	bufprint("|%s" #x, (flags & NETIF_FLAG_##x)? "!": "")
+	#define IFF(x)	do { if (flags & NETIF_FLAG_##x) bufprint("|" #x); } while (0)
 	IFF(UP);
 	IFF(BROADCAST);
 	IFF(POINTTOPOINT);
@@ -142,11 +101,12 @@ void stub_display_netif_flags (int flags)
 
 void stub_display_netif (struct netif* netif)
 {
-	bufprint("@%p name=%c%c idx=%d mtu=%d input=%p output=%p flags=",
+	bufprint("@%p name=%c%c idx=%d mtu=%d state=%p input=%p output=%p flags=",
 		netif,
 		netif->name[0], netif->name[1],
 		netif->num,
 		netif->mtu,
+		netif->state,
 		netif->input,
 		netif->output);
 	stub_display_netif_flags(netif->flags);
@@ -175,13 +135,13 @@ void espconn_init (void)
 void dhcp_cleanup(struct netif *netif)
 {
 	STUB(dhcp_cleanup);
-	stub_display_netif(netif);
+	stub_display_netif(netif); nl();
 }
 
 err_t dhcp_release(struct netif *netif)
 {
 	STUB(dhcp_release);
-	stub_display_netif(netif);
+	stub_display_netif(netif); nl();
 	return ERR_ABRT;
 }
 
@@ -202,7 +162,6 @@ err_t dhcp_start (struct netif* netif)
 	bufprint_allow = 1;
 	
 	//STUB(dhcp_start);
-	call_stat_print();
 
 	bufprint("STUB: dhcp_start (");
 	stub_display_netif(netif);
@@ -220,7 +179,7 @@ err_t dhcp_start (struct netif* netif)
 void dhcp_stop(struct netif *netif)
 {
 	STUB(dhcp_stop);
-	stub_display_netif(netif);
+	stub_display_netif(netif); nl();
 }
 
 /**
@@ -228,8 +187,6 @@ void dhcp_stop(struct netif *netif)
  */
 void lwip_init (void)
 {
-	call_stat_init();
-	
 	STUB(lwip_init);
 }
 
@@ -247,16 +204,82 @@ void lwip_init (void)
  *
  * @return netif, or NULL if failed.
  */
-struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw, void *state, netif_init_fn init, netif_input_fn input)
+struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw, void *state, netif_init_fn init, netif_input_fn packet_incoming)
 {
-	call_stats[CS_NETIF_ADD]++;
-	STUB(netif_add);
+	// netif->output is "packet_ougtoing" already initialized
+	// packet_incoming is given for us to put in *netif
+	//STUB(netif_add);
 
-	stub_display_ip("ip=", *ipaddr);
-	stub_display_ip("mask=", *netmask);
-	stub_display_ip("gw=", *gw);
-	bufprint("state=%p init=%p input=%p ", state, init, input);
+	//stub_display_ip("STUB: netif_add ip=", *ipaddr);
+	//stub_display_ip(" mask=", *netmask);
+	//stub_display_ip(" gw=", *gw);
+	//bufprint(" state=%p init=%p input=%p ", state, init, packet_incoming);
+	//stub_display_netif(netif);
+	//bufprint("\n");
+	
+	
+	//////////////////////////////
+	// this is revisited ESP lwip implementation
+	netif->ip_addr.addr = 0;
+	netif->netmask.addr = 0;
+	netif->gw.addr = 0;
+	netif->flags = 0;
+	#if LWIP_DHCP
+	// ok
+	netif->dhcp = NULL;
+	netif->dhcps_pcb = NULL;
+	#endif /* LWIP_DHCP */
+		#if LWIP_AUTOIP
+		#error
+		netif->autoip = NULL;
+		#endif /* LWIP_AUTOIP */
+		#if LWIP_NETIF_STATUS_CALLBACK
+		#error
+		netif->status_callback = NULL;
+		#endif /* LWIP_NETIF_STATUS_CALLBACK */
+		#if LWIP_NETIF_LINK_CALLBACK
+		#error
+		netif->link_callback = NULL;
+		#endif /* LWIP_NETIF_LINK_CALLBACK */
+	#if LWIP_IGMP
+	// ok
+	netif->igmp_mac_filter = NULL;
+	#endif /* LWIP_IGMP */
+		#if ENABLE_LOOPBACK
+		#error
+		netif->loop_first = NULL;
+		netif->loop_last = NULL;
+		#endif /* ENABLE_LOOPBACK */
+	netif->state = state;
+	netif->num = 1;//netifnum++;
+	netif->input = packet_incoming;
+		#if LWIP_NETIF_HWADDRHINT
+		#error
+		netif->addr_hint = NULL;
+		#endif /* LWIP_NETIF_HWADDRHINT*/
+		#if ENABLE_LOOPBACK && LWIP_LOOPBACK_MAX_PBUFS
+		#error
+		netif->loop_cnt_current = 0;
+		#endif /* ENABLE_LOOPBACK && LWIP_LOOPBACK_MAX_PBUFS */
+	netif_set_addr(netif, ipaddr, netmask, gw);
+	if (init(netif) != ERR_OK)
+	{
+		bufprint("ERROR netif_add: caller's init() failed\n");
+		return NULL;
+	}
+	netif->next = NULL; //netif_list;
+	//netif_list = netif;
+//	snmp_inc_iflist();
+	#if LWIP_IGMP
+	// ok
+//	if (netif->flags & NETIF_FLAG_IGMP)
+//		igmp_start(netif);
+	#endif /* LWIP_IGMP */
+	//////////////////////////////
+
+	bufprint("STUB: netif_add(ed): ");
 	stub_display_netif(netif);
+	bufprint("\n");
 	
 	//return glue2old_netif(glue_oldcall_netif_add());
 	
@@ -270,9 +293,8 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
  */
 void netif_remove (struct netif *netif)
 {
-	call_stats[CS_NETIF_REMOVE]++;
 	STUB(netif_remove);
-	stub_display_netif(netif);
+	stub_display_netif(netif); nl();
 }
 
 /**
@@ -286,10 +308,12 @@ void netif_remove (struct netif *netif)
  */
 void netif_set_addr (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw)
 {
-(void)ipaddr; (void)netmask; (void)gw;
-	call_stats[CS_NETIF_SET_ADDR]++;
-	STUB(netif_set_addr);
-	stub_display_netif(netif);
+	//STUB(netif_set_addr);
+	bufprint("STUB: netif_set_addr: ");
+	if (ipaddr) netif->ip_addr = *ipaddr;
+	if (netmask) netif->netmask = *netmask;
+	if (gw) netif->gw = *gw;
+	stub_display_netif(netif); nl();
 }
 
 /**
@@ -300,9 +324,9 @@ void netif_set_addr (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask,
  */
 void netif_set_default (struct netif *netif)
 {
-	call_stats[CS_NETIF_SET_DEFAULT]++;
-	STUB(netif_set_default);
-	stub_display_netif(netif);
+	//STUB(netif_set_default);
+	//stub_display_netif(netif); nl();
+	bufprint("STUB: netif_set_default: %p\n", netif);
 }
 
 /**
@@ -316,7 +340,7 @@ void netif_set_default (struct netif *netif)
 void netif_set_down(struct netif *netif)
 {
 	STUB(netif_set_down);
-	stub_display_netif(netif);
+	stub_display_netif(netif); nl();
 }
 
 /**
@@ -330,9 +354,8 @@ void netif_set_down(struct netif *netif)
  */ 
 void netif_set_up(struct netif *netif)
 {
-	call_stats[CS_NETIF_SET_UP]++;
 	STUB(netif_set_up);
-	stub_display_netif(netif);
+	stub_display_netif(netif); nl();
 }
 
 
@@ -409,7 +432,7 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 		/* set flags */
 		p->flags = 0;
 		
-		bufprint("STUB: ret 0x%p (%d bytes)\n", p, alloclen);
+		bufprint("STUB: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
 		
 		return p;
 	}

@@ -1,5 +1,7 @@
 
 #include <stdarg.h>
+#include <osapi.h>
+
 #include "bufprint.h"
 
 static int in = 0;
