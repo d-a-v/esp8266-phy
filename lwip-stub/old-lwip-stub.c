@@ -312,7 +312,7 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 		#endif /* ENABLE_LOOPBACK */
 	netif->state = state;
 	netif->num = 1;//netifnum++;
-	netif->input = packet_incoming;
+	netif->input = packet_incoming; // = (old above)ethernet_input(never called)
 		#if LWIP_NETIF_HWADDRHINT
 		#error
 		netif->addr_hint = NULL;
@@ -369,6 +369,9 @@ glue_netif_flags_t old2glue_netif_flags (u8_t flags)
 #if 0
 WIP
 
+// new lwip calls netif->lin
+err_t glue2old_link_output (struct netif *netif, struct pbuf *p, ip_addr_t *ipaddr)
+
 void oldnetif_updated (struct netif* netif)
 {
 	u8_t glueflags = old2glue_netif_flags(netif->flags);
@@ -381,8 +384,7 @@ replace linkoutput to translator calling old linkoutput
 		netif->gw,
 		glueflags,
 		state,
-		
-		);
+		netif->
 #endif // 0
 
 /**
