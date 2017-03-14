@@ -101,18 +101,63 @@ void stub_display_netif_flags (int flags)
 
 void stub_display_netif (struct netif* netif)
 {
-	bufprint("@%p name=%c%c idx=%d mtu=%d state=%p input=%p output=%p flags=",
+	bufprint("@%p name=%c%c idx=%d mtu=%d state=%p " /*"input=%p output=%p"*/ "linkout=%p flags=",
 		netif,
 		netif->name[0], netif->name[1],
 		netif->num,
 		netif->mtu,
 		netif->state,
-		netif->input,
-		netif->output);
+		//netif->input,		// useless: they always are our
+		//netif->output,	// etharp_output / ethernet_input :)
+		netif->linkoutput);
 	stub_display_netif_flags(netif->flags);
 }
 
 ///////////////////////////////////////
+// STUBS
+
+/**
+ * Resolve and fill-in Ethernet address header for outgoing IP packet.
+ *
+ * For IP multicast and broadcast, corresponding Ethernet addresses
+ * are selected and the packet is transmitted on the link.
+ *
+ * For unicast addresses, the packet is submitted to etharp_query(). In
+ * case the IP address is outside the local network, the IP address of 
+ * the gateway is used.
+ *
+ * @param netif The lwIP network interface which the IP packet will be sent on.
+ * @param q The pbuf(s) containing the IP packet to be sent.
+ * @param ipaddr The IP address of the packet destination.  
+ *
+ * @return
+ * - ERR_RTE No route to destination (no gateway to external networks),
+ * or the return type of either etharp_query() or etharp_send_ip().
+ */
+err_t etharp_output(struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
+{
+	(void)netif; (void)q; (void)ipaddr;
+	//STUB(etharp_output);
+	bufprint("ERROR: STUB etharp_output should not be called\n");
+	return ERR_ABRT;
+}
+                   
+ /**
+ * Process received ethernet frames. Using this function instead of directly
+ * calling ip_input and passing ARP frames through etharp in ethernetif_input,
+ * the ARP cache is protected from concurrent access.
+ *
+ * @param p the recevied packet, p->payload pointing to the ethernet header
+ * @param netif the network interface on which the packet was received
+ */
+err_t ethernet_input(struct pbuf *p, struct netif *netif)
+{
+	(void)p; (void)netif;
+	//STUB(ethernet_input);
+	bufprint("ERROR: STUB ethernet_input should not be called\n");
+	return ERR_ABRT;
+}
+
 
 void dhcps_start (struct ip_info *info)
 {
@@ -204,6 +249,22 @@ void lwip_init (void)
  *
  * @return netif, or NULL if failed.
  */
+ 
+// static and only interface;
+static struct netif* old_netif = NULL;
+void check_netif (struct netif* netif)
+{
+	if (old_netif)
+	{
+		if (old_netif != netif)
+			bufprint("ERROR: new netif appeared!\n");
+	}
+	else
+		old_netif = netif;
+	if (netif->input != ethernet_input || netif->output != etharp_output)
+		bufprint("ERROR: input != ethernet_input or output != etharp->output\n");
+}
+
 struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw, void *state, netif_init_fn init, netif_input_fn packet_incoming)
 {
 	// netif->output is "packet_ougtoing" already initialized
@@ -216,7 +277,6 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	//bufprint(" state=%p init=%p input=%p ", state, init, packet_incoming);
 	//stub_display_netif(netif);
 	//bufprint("\n");
-	
 	
 	//////////////////////////////
 	// this is revisited ESP lwip implementation
@@ -269,14 +329,16 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	}
 	netif->next = NULL; //netif_list;
 	//netif_list = netif;
-//	snmp_inc_iflist();
+//XXX	snmp_inc_iflist();
 	#if LWIP_IGMP
 	// ok
-//	if (netif->flags & NETIF_FLAG_IGMP)
-//		igmp_start(netif);
+//XXX	if (netif->flags & NETIF_FLAG_IGMP)
+//XXX		igmp_start(netif);
 	#endif /* LWIP_IGMP */
 	//////////////////////////////
 
+	check_netif(netif);
+	
 	bufprint("STUB: netif_add(ed): ");
 	stub_display_netif(netif);
 	bufprint("\n");
@@ -285,6 +347,43 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	
 	return NULL;
 }
+
+glue_netif_flags_t old2glue_netif_flags (u8_t flags)
+{
+	u8_t gf = 0;
+	#define CF(x)	do { if (flags & NETIF_FLAG_##x) { gf |= GLUE_NETIF_FLAG_##x; flags &= ~NETIF_FLAG_##x; } } while (0)
+	CF(UP);
+	CF(BROADCAST);
+	//CF(POINTTOPOINT);
+	//CF(DHCP);
+	//CF(LINK_UP);
+	CF(ETHARP);
+	//CF(ETHERNET);
+	CF(IGMP);
+	#undef CF
+	if (flags)
+		bufprint("ERROR old2glue_netif_flags: remaining flags not converted\n");
+	return gf;
+}
+
+#if 0
+WIP
+
+void oldnetif_updated (struct netif* netif)
+{
+	u8_t glueflags = old2glue_netif_flags(netif->flags);
+
+replace linkoutput to translator calling old linkoutput
+
+	glue_oldnetif_updated(
+		netif->ip_addr,
+		netif->netmask,
+		netif->gw,
+		glueflags,
+		state,
+		
+		);
+#endif // 0
 
 /**
  * Remove a network interface from the list of lwIP netifs.
@@ -555,42 +654,3 @@ void sys_untimeout(sys_timeout_handler handler, void *arg)
 	STUB(sys_untimeout);
 }
 
-/**
- * Resolve and fill-in Ethernet address header for outgoing IP packet.
- *
- * For IP multicast and broadcast, corresponding Ethernet addresses
- * are selected and the packet is transmitted on the link.
- *
- * For unicast addresses, the packet is submitted to etharp_query(). In
- * case the IP address is outside the local network, the IP address of 
- * the gateway is used.
- *
- * @param netif The lwIP network interface which the IP packet will be sent on.
- * @param q The pbuf(s) containing the IP packet to be sent.
- * @param ipaddr The IP address of the packet destination.  
- *
- * @return
- * - ERR_RTE No route to destination (no gateway to external networks),
- * or the return type of either etharp_query() or etharp_send_ip().
- */
-err_t etharp_output(struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
-{
-(void)netif; (void)q; (void)ipaddr;
-	STUB(etharp_output);
-	return ERR_ABRT;
-}
-                   
- /**
- * Process received ethernet frames. Using this function instead of directly
- * calling ip_input and passing ARP frames through etharp in ethernetif_input,
- * the ARP cache is protected from concurrent access.
- *
- * @param p the recevied packet, p->payload pointing to the ethernet header
- * @param netif the network interface on which the packet was received
- */
-err_t ethernet_input(struct pbuf *p, struct netif *netif)
-{
-(void)p; (void)netif;
-	STUB(ethernet_input);
-	return ERR_ABRT;
-}

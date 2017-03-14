@@ -31,6 +31,14 @@ typedef enum
 	GLUE_ERR_ARG        = -16
 } err_glue_t;
 
+typedef enum
+{
+	GLUE_NETIF_FLAG_BROADCAST	= 1,
+	GLUE_NETIF_FLAG_UP		= 2,
+	GLUE_NETIF_FLAG_ETHARP		= 4,
+	GLUE_NETIF_FLAG_IGMP		= 8,
+} glue_netif_flags_t;
+
 err_glue_t glue_oldcall_dhcp_start (struct netif_glue* netif);
 
 #endif // GLUE_STUB_H
