@@ -5,8 +5,7 @@
 
 #include "glue-stub.h"
 
-struct netif netif_global;
-struct netif_glue netif_glue_global;
+struct netif netif_new;
 
 err_t glue2new_err (err_glue_t err)
 {
@@ -60,27 +59,28 @@ err_glue_t new2glue_err (err_t err)
 	}
 };	
 
-#if 0
-struct netif* glue2new_netif (struct netif_glue* glue)
+u8_t glue2new_netif_flags (glue_netif_flags_t flags)
 {
-	// so far: do nothing for netif
-	(void)glue;
-	
-	static char initialized = 0;
-	if (!initialized)
-	{
-		initialized = 1;
-		os_memset(&netif_global, 0, sizeof netif_global);
-		//netif_global.flags |= NETIF_FLAG_UP;
-	}
-	
-	return &netif_global;
+	glue_netif_flags_t copy = flags;
+	u8_t nf = 0;
+	#define CF(x)	do { if (flags & GLUE_NETIF_FLAG_##x) { nf |= NETIF_FLAG_##x; flags &= ~GLUE_NETIF_FLAG_##x; } } while (0)
+	CF(UP);
+	CF(BROADCAST);
+	//CF(POINTTOPOINT);
+	//CF(DHCP);
+	CF(LINK_UP);
+	CF(ETHARP);
+	//CF(ETHERNET);
+	CF(IGMP);
+	#undef CF
+	if (flags)
+		bufprint("ERROR old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
+	return nf;
 }
-#endif
 
 err_glue_t glue_oldcall_dhcp_start ()
 {
-	return new2glue_err(dhcp_start(netif_global));
+	return new2glue_err(dhcp_start(netif_new));
 }
 
 void dhcp_set_ntp_servers(u8_t num_ntp_servers, ip_addr_t* ntp_server_addrs)
@@ -91,5 +91,124 @@ void dhcp_set_ntp_servers(u8_t num_ntp_servers, ip_addr_t* ntp_server_addrs)
 
 void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, void* state)
 {
+	#if !LWIP_SINGLE_NETIF
+	new_netif.next = NULL;
+	#endif
+
+	#if LWIP_IPV4
+#error
+	/** IP address configuration in network byte order */
+	new_netif.ip_addr.addr = ip;
+	new_netif.netmask.addr = mask;
+	new_netif.gw.addr = gw;
+	#endif /* LWIP_IPV4 */
+	
+	#if LWIP_IPV6
+	#error
+	//ip_addr_t ip6_addr[LWIP_IPV6_NUM_ADDRESSES];
+	//u8_t ip6_addr_state[LWIP_IPV6_NUM_ADDRESSES];
+	#if LWIP_IPV6_ADDRESS_LIFETIMES
+	/** Remaining valid and preferred lifetime of each IPv6 address, in seconds.
+	   * For valid lifetimes, the special value of IP6_ADDR_LIFE_STATIC (0)
+	   * indicates the address is static and has no lifetimes. */
+	//u32_t ip6_addr_valid_life[LWIP_IPV6_NUM_ADDRESSES];
+	//u32_t ip6_addr_pref_life[LWIP_IPV6_NUM_ADDRESSES];
+	#endif /* LWIP_IPV6_ADDRESS_LIFETIMES */
+	#endif /* LWIP_IPV6 */
+
+	new_netif.input = new_input;
+	new_netif.output = new_output;
+	new_netif.linkoutput = new_linoutput;
+
+	#if LWIP_IPV6
+	#error
+	new_netif.output_ip6 = blah
+	#endif /* LWIP_IPV6 */
+
+	#if LWIP_NETIF_STATUS_CALLBACK
+	#error
+	new_netif.status_callback = blah
+	#endif /* LWIP_NETIF_STATUS_CALLBACK */
+
+	#if LWIP_NETIF_LINK_CALLBACK
+	#error
+	new_netif.link_callback = blah
+	#endif /* LWIP_NETIF_LINK_CALLBACK */
+
+	#if LWIP_NETIF_REMOVE_CALLBACK
+	#error
+	new_netif.remove_callback = blah
+	#endif /* LWIP_NETIF_REMOVE_CALLBACK */
+	
+	new_netif.state = state; // useless
+
+	#ifdef netif_get_client_data
+	#error
+	//void* client_data[LWIP_NETIF_CLIENT_DATA_INDEX_MAX + LWIP_NUM_NETIF_CLIENT_DATA];
+	#endif
+	
+	#if LWIP_NETIF_HOSTNAME
+	#error
+	new_netif.hostname = NULL;
+	#endif /* LWIP_NETIF_HOSTNAME */
+	
+	#if LWIP_CHECKSUM_CTRL_PER_NETIF
+	#error
+	//?chksum_flags
+	#endif /* LWIP_CHECKSUM_CTRL_PER_NETIF*/
+	
+	new_netif.mtu = MTU;
+	
+	//hwaddr[NETIF_MAX_HWADDR_LEN];
+	new_netif.hwaddr_len = 0;
+
+	new_netif.flags = glue2new_netif_flags(flags)
+XXXXXXXXXXXXXXXXXXX
+  /** descriptive abbreviation */
+  char name[2];
+  /** number of this interface. Used for @ref if_api and @ref netifapi_netif,
+   * as well as for IPv6 zones */
+  u8_t num;
+#if LWIP_IPV6_AUTOCONFIG
+  /** is this netif enabled for IPv6 autoconfiguration */
+  u8_t ip6_autoconfig_enabled;
+#endif /* LWIP_IPV6_AUTOCONFIG */
+#if LWIP_IPV6_SEND_ROUTER_SOLICIT
+  /** Number of Router Solicitation messages that remain to be sent. */
+  u8_t rs_count;
+#endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
+#if MIB2_STATS
+  /** link type (from "snmp_ifType" enum from snmp_mib2.h) */
+  u8_t link_type;
+  /** (estimate) link speed */
+  u32_t link_speed;
+  /** timestamp at last change made (up/down) */
+  u32_t ts;
+    /** counters */
+  struct stats_mib2_netif_ctrs mib2_counters;
+#endif /* MIB2_STATS */
+#if LWIP_IPV4 && LWIP_IGMP
+  /** This function could be called to add or delete an entry in the multicast
+      filter table of the ethernet MAC.*/
+  netif_igmp_mac_filter_fn igmp_mac_filter;
+#endif /* LWIP_IPV4 && LWIP_IGMP */
+#if LWIP_IPV6 && LWIP_IPV6_MLD
+  /** This function could be called to add or delete an entry in the IPv6 multicast
+      filter table of the ethernet MAC. */
+  netif_mld_mac_filter_fn mld_mac_filter;
+#endif /* LWIP_IPV6 && LWIP_IPV6_MLD */
+#if LWIP_NETIF_HWADDRHINT
+  u8_t *addr_hint;
+#endif /* LWIP_NETIF_HWADDRHINT */
+#if ENABLE_LOOPBACK
+  /* List of packets to be queued for ourselves. */
+  struct pbuf *loop_first;
+  struct pbuf *loop_last;
+#if LWIP_LOOPBACK_MAX_PBUFS
+  u16_t loop_cnt_current;
+#endif /* LWIP_LOOPBACK_MAX_PBUFS */
+#endif /* ENABLE_LOOPBACK */
+};
+
 	bufprint("TODO old2glue_oldnetif_updated\n");
 }

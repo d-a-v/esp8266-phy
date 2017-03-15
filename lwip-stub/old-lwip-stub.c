@@ -102,7 +102,7 @@ glue_netif_flags_t old2glue_netif_flags (u8_t flags)
 	return gf;
 }
 
-void old2glue_netif_updated (struct netif* netif)
+void netif_updated (struct netif* netif)
 {
 	u8_t glueflags = old2glue_netif_flags(netif->flags);
 
@@ -129,7 +129,7 @@ err_glue_t glue2old_linkoutput (char* rawdata, uint16_t size)
 	return old2glue_err(linkoutput(old_netif, &rocket));
 }
 
-void check_netif (struct netif* netif)
+void netif_check (struct netif* netif)
 {
 	if (!old_netif)
 	{
@@ -288,11 +288,11 @@ err_t dhcp_start (struct netif* netif)
 	
 	//STUB(dhcp_start);
 
-	bufprint("STUB: dhcp_start (");
+	bufprint("WRAP: dhcp_start (");
 	stub_display_netif(netif);
 	bufprint(")\n");
 
-	check_netif(netif);
+	netif_check(netif);
 	return glue2old_err(glue_oldcall_dhcp_start());
 }
 
@@ -399,13 +399,12 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	#endif /* LWIP_IGMP */
 	//////////////////////////////
 
-	check_netif(netif);
-	old2glue_netif_updated(netif);
+	netif_check(netif);
+	netif_updated(netif);
 	
-	bufprint("STUB: netif_add(ed): ");
+	bufprint("WRAP: netif_add(ed): ");
 	stub_display_netif(netif);
 	bufprint("\n");
-	
 	
 	return netif;
 }
@@ -434,11 +433,14 @@ void netif_remove (struct netif *netif)
 void netif_set_addr (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw)
 {
 	//STUB(netif_set_addr);
-	bufprint("STUB: netif_set_addr (SHOULD BE CALLED?): ");
 	if (ipaddr) netif->ip_addr = *ipaddr;
 	if (netmask) netif->netmask = *netmask;
 	if (gw) netif->gw = *gw;
-	old2glue_netif_updated(netif);
+	bufprint("WRAP: netif_set_addr ");
+	if (ipaddr) stub_display_ip("ip=", *ipaddr);
+	if (netmask) stub_display_ip(" mask=", *netmask);
+	if (gw) stub_display_ip(" gw=", *gw);
+	netif_updated(netif);
 	stub_display_netif(netif); nl();
 }
 
@@ -452,7 +454,7 @@ void netif_set_default (struct netif *netif)
 {
 	//STUB(netif_set_default);
 	//stub_display_netif(netif); nl();
-	bufprint("STUB: netif_set_default: %p\n", netif);
+	bufprint("WRAP: netif_set_default: %p\n", netif);
 	// ... yes this is default
 }
 
