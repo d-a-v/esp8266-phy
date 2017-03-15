@@ -39,6 +39,6 @@ typedef enum
 	GLUE_NETIF_FLAG_IGMP		= 8,
 } glue_netif_flags_t;
 
-err_glue_t glue_oldcall_dhcp_start (struct netif_glue* netif);
+err_glue_t glue_oldcall_dhcp_start (void);
 
 #endif // GLUE_STUB_H

@@ -58,11 +58,90 @@ err_t glue2old_err (err_glue_t err)
 	}
 };
 
-struct netif_glue* old2glue_netif (struct netif* old)
+err_glue_t old2glue_err (err_glue_t err)
 {
-	// so far: do nothing for netif
-	(void)old;
-	return &netif_glue_global;
+	switch (err)
+	{
+	case ERR_OK         : return GLUE_ERR_OK;
+	case ERR_MEM        : return GLUE_ERR_MEM;
+	case ERR_BUF        : return GLUE_ERR_BUF;
+	case ERR_TIMEOUT    : return GLUE_ERR_TIMEOUT;
+	case ERR_RTE        : return GLUE_ERR_RTE;
+	case ERR_INPROGRESS : return GLUE_ERR_INPROGRESS;
+	case ERR_VAL        : return GLUE_ERR_VAL;
+	case ERR_WOULDBLOCK : return GLUE_ERR_WOULDBLOCK;
+	case ERR_ABRT       : return GLUE_ERR_ABRT;
+	case ERR_RST        : return GLUE_ERR_RST;
+	case ERR_CLSD       : return GLUE_ERR_CLSD;
+	case ERR_CONN       : return GLUE_ERR_CONN;
+	case ERR_ARG        : return GLUE_ERR_ARG;
+	case ERR_USE        : return GLUE_ERR_USE;
+	case ERR_IF         : return GLUE_ERR_IF;
+	case ERR_ISCONN     : return GLUE_ERR_ISCONN;
+
+	default: return GLUE_ERR_ABRT;
+	}
+};
+
+glue_netif_flags_t old2glue_netif_flags (u8_t flags)
+{
+	u8_t gf = 0;
+	#define CF(x)	do { if (flags & NETIF_FLAG_##x) { gf |= GLUE_NETIF_FLAG_##x; flags &= ~NETIF_FLAG_##x; } } while (0)
+	CF(UP);
+	CF(BROADCAST);
+	//CF(POINTTOPOINT);
+	//CF(DHCP);
+	//CF(LINK_UP);
+	CF(ETHARP);
+	//CF(ETHERNET);
+	CF(IGMP);
+	#undef CF
+	if (flags)
+		bufprint("ERROR old2glue_netif_flags: remaining flags not converted\n");
+	return gf;
+}
+
+void old2glue_netif_updated (struct netif* netif)
+{
+	u8_t glueflags = old2glue_netif_flags(netif->flags);
+
+	glue_oldnetif_updated(
+		netif->ip_addr,
+		netif->netmask,
+		netif->gw,
+		glueflags,
+		netif->state);
+}
+
+//typedef err_t (*netif_linkoutput_fn)(struct netif *netif, struct pbuf *p);
+static struct netif* old_netif = NULL;
+netif_linkoutput_fn linkoutput = NULL;
+
+err_glue_t glue2old_linkoutput (char* rawdata, uint16_t size)
+{
+	bufprint("LINKOUTPUT: real packet sent to wildness (%dB)\n",
+		(int)size);
+	
+	static struct pbuf rocket = { .payload = NULL, .len = 0, .tot_len = 0, .next = NULL, .type = PBUF_REF, .ref = 1, .flags = 0 };
+	rocket.payload = rawdata;
+	rocket.len = rocket.tot_len = size;
+	return old2glue_err(linkoutput(old_netif, &rocket));
+}
+
+void check_netif (struct netif* netif)
+{
+	if (!old_netif)
+	{
+		old_netif = netif;
+		linkoutput = netif->linkoutput;
+	}
+
+	if (   netif != old_netif
+	    || netif->input != ethernet_input
+	    || netif->output != etharp_output
+	    || netif->linkoutput != linkoutput
+	   )
+		bufprint("ERROR: bad netif invariants\n");
 }
 
 ///////////////////////////////////////
@@ -212,13 +291,8 @@ err_t dhcp_start (struct netif* netif)
 	stub_display_netif(netif);
 	bufprint(")\n");
 
-	// important data to translate:
-	// input: esp calls it when a packet is received
-	// output: to be called by lwip when a packet is to be sent
-
-	return glue2old_err(glue_oldcall_dhcp_start(old2glue_netif(netif)));
-	
-	return ERR_ABRT;
+	check_netif(netif);
+	return glue2old_err(glue_oldcall_dhcp_start());
 }
 
 void dhcp_stop(struct netif *netif)
@@ -227,6 +301,7 @@ void dhcp_stop(struct netif *netif)
 	stub_display_netif(netif); nl();
 }
 
+#if 0
 /**
  * Perform Sanity check of user-configurable values, and initialize all modules.
  */
@@ -234,6 +309,7 @@ void lwip_init (void)
 {
 	STUB(lwip_init);
 }
+#endif
 
 /**
  * Add a network interface to the list of lwIP netifs.
@@ -250,21 +326,6 @@ void lwip_init (void)
  * @return netif, or NULL if failed.
  */
  
-// static and only interface;
-static struct netif* old_netif = NULL;
-void check_netif (struct netif* netif)
-{
-	if (old_netif)
-	{
-		if (old_netif != netif)
-			bufprint("ERROR: new netif appeared!\n");
-	}
-	else
-		old_netif = netif;
-	if (netif->input != ethernet_input || netif->output != etharp_output)
-		bufprint("ERROR: input != ethernet_input or output != etharp->output\n");
-}
-
 struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw, void *state, netif_init_fn init, netif_input_fn packet_incoming)
 {
 	// netif->output is "packet_ougtoing" already initialized
@@ -338,54 +399,16 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	//////////////////////////////
 
 	check_netif(netif);
+	old2glue_netif_updated(netif);
 	
 	bufprint("STUB: netif_add(ed): ");
 	stub_display_netif(netif);
 	bufprint("\n");
 	
-	//return glue2old_netif(glue_oldcall_netif_add());
 	
-	return NULL;
+	return netif;
 }
 
-glue_netif_flags_t old2glue_netif_flags (u8_t flags)
-{
-	u8_t gf = 0;
-	#define CF(x)	do { if (flags & NETIF_FLAG_##x) { gf |= GLUE_NETIF_FLAG_##x; flags &= ~NETIF_FLAG_##x; } } while (0)
-	CF(UP);
-	CF(BROADCAST);
-	//CF(POINTTOPOINT);
-	//CF(DHCP);
-	//CF(LINK_UP);
-	CF(ETHARP);
-	//CF(ETHERNET);
-	CF(IGMP);
-	#undef CF
-	if (flags)
-		bufprint("ERROR old2glue_netif_flags: remaining flags not converted\n");
-	return gf;
-}
-
-#if 0
-WIP
-
-// new lwip calls netif->lin
-err_t glue2old_link_output (struct netif *netif, struct pbuf *p, ip_addr_t *ipaddr)
-
-void oldnetif_updated (struct netif* netif)
-{
-	u8_t glueflags = old2glue_netif_flags(netif->flags);
-
-replace linkoutput to translator calling old linkoutput
-
-	glue_oldnetif_updated(
-		netif->ip_addr,
-		netif->netmask,
-		netif->gw,
-		glueflags,
-		state,
-		netif->
-#endif // 0
 
 /**
  * Remove a network interface from the list of lwIP netifs.
@@ -410,10 +433,11 @@ void netif_remove (struct netif *netif)
 void netif_set_addr (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw)
 {
 	//STUB(netif_set_addr);
-	bufprint("STUB: netif_set_addr: ");
+	bufprint("STUB: netif_set_addr (SHOULD BE CALLED?): ");
 	if (ipaddr) netif->ip_addr = *ipaddr;
 	if (netmask) netif->netmask = *netmask;
 	if (gw) netif->gw = *gw;
+	old2glue_netif_updated(netif);
 	stub_display_netif(netif); nl();
 }
 
@@ -428,6 +452,7 @@ void netif_set_default (struct netif *netif)
 	//STUB(netif_set_default);
 	//stub_display_netif(netif); nl();
 	bufprint("STUB: netif_set_default: %p\n", netif);
+	// ... yes this is default
 }
 
 /**
@@ -601,20 +626,23 @@ u8_t pbuf_free(struct pbuf *p)
  * @param p pbuf to increase reference counter of
  *
  */
-void pbuf_ref(struct pbuf *p)
+void pbuf_ref (struct pbuf *p)
 {
-(void)p;
-	STUB(pbuf_ref);
+	//STUB(pbuf_ref);
+	bufprint("STUB: pbuf_ref(%p) ref=%d\n", p, p->ref);
+	if (p)
+		++(p->ref);
 }
 
 
+#if 0
 /** Handle timeouts for NO_SYS==1 (i.e. without using
  * tcpip_thread/sys_timeouts_mbox_fetch(). Uses sys_now() to call timeout
  * handler functions when timeouts expire.
  *
  * Must be called periodically from your main loop.
  */
-void sys_check_timeouts(void)
+void sys_check_timeouts (void)
 {
 	static uint8_t r = 0;
 	if ((++r & 63) == 0)
@@ -623,6 +651,7 @@ void sys_check_timeouts(void)
 		bufprint(".");
 	}
 }
+#endif
 
 /**
  * Create a one-shot timer (aka timeout). Timeouts are processed in the

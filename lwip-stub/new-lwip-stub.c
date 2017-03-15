@@ -60,6 +60,7 @@ err_glue_t new2glue_err (err_t err)
 	}
 };	
 
+#if 0
 struct netif* glue2new_netif (struct netif_glue* glue)
 {
 	// so far: do nothing for netif
@@ -75,10 +76,11 @@ struct netif* glue2new_netif (struct netif_glue* glue)
 	
 	return &netif_global;
 }
+#endif
 
-err_glue_t glue_oldcall_dhcp_start (struct netif_glue* netif)
+err_glue_t glue_oldcall_dhcp_start ()
 {
-	return new2glue_err(dhcp_start(glue2new_netif(netif)));
+	return new2glue_err(dhcp_start(netif_global));
 }
 
 void dhcp_set_ntp_servers(u8_t num_ntp_servers, ip_addr_t* ntp_server_addrs)

@@ -16,7 +16,7 @@
 #define etharp_output etharp_output_STUBBED
 #define ethbroadcast ethbroadcast_STUBBED
 #define ethernet_input ethernet_input_STUBBED
-#define lwip_init lwip_init_STUBBED
+//#define lwip_init lwip_init_STUBBED				// same signature
 #define netif_add netif_add_STUBBED
 #define netif_default netif_default_STUBBED
 #define netif_remove netif_remove_STUBBED
@@ -27,7 +27,7 @@
 #define pbuf_alloc pbuf_alloc_STUBBED
 #define pbuf_free pbuf_free_STUBBED
 #define pbuf_ref pbuf_ref_STUBBED
-#define sys_check_timeouts sys_check_timeouts_STUBBED
+//#define sys_check_timeouts sys_check_timeouts_STUBBED		// same signature
 #define sys_timeout sys_timeout_STUBBED
 #define sys_untimeout sys_untimeout_STUBBED
 

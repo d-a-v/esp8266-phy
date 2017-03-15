@@ -1,6 +1,11 @@
 
 #include "osapi.h"
 #include "lwip-stubbed-symbols.h"
+#define printf bufprint
+
+#define sys_now millis		// arduino wire definition returns 32 bits like sys_now
+#define LWIP_RAND r_rand	// old lwip use this undocumented function
+
 
 /**
  * @file
