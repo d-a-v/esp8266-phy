@@ -37,8 +37,11 @@ typedef enum
 	GLUE_NETIF_FLAG_UP		= 2,
 	GLUE_NETIF_FLAG_ETHARP		= 4,
 	GLUE_NETIF_FLAG_IGMP		= 8,
+	GLUE_NETIF_FLAG_LINK_UP		= 16,
 } glue_netif_flags_t;
 
 err_glue_t glue_oldcall_dhcp_start (void);
+
+void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, void* state);
 
 #endif // GLUE_STUB_H

@@ -85,19 +85,20 @@ err_glue_t old2glue_err (err_glue_t err)
 
 glue_netif_flags_t old2glue_netif_flags (u8_t flags)
 {
+	u8_t copy = flags;
 	u8_t gf = 0;
 	#define CF(x)	do { if (flags & NETIF_FLAG_##x) { gf |= GLUE_NETIF_FLAG_##x; flags &= ~NETIF_FLAG_##x; } } while (0)
 	CF(UP);
 	CF(BROADCAST);
 	//CF(POINTTOPOINT);
 	//CF(DHCP);
-	//CF(LINK_UP);
+	CF(LINK_UP);
 	CF(ETHARP);
 	//CF(ETHERNET);
 	CF(IGMP);
 	#undef CF
 	if (flags)
-		bufprint("ERROR old2glue_netif_flags: remaining flags not converted\n");
+		bufprint("ERROR old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
 	return gf;
 }
 
@@ -105,10 +106,10 @@ void old2glue_netif_updated (struct netif* netif)
 {
 	u8_t glueflags = old2glue_netif_flags(netif->flags);
 
-	glue_oldnetif_updated(
-		netif->ip_addr,
-		netif->netmask,
-		netif->gw,
+	old2glue_oldnetif_updated(
+		netif->ip_addr.addr,
+		netif->netmask.addr,
+		netif->gw.addr,
 		glueflags,
 		netif->state);
 }
@@ -483,7 +484,6 @@ void netif_set_up(struct netif *netif)
 	STUB(netif_set_up);
 	stub_display_netif(netif); nl();
 }
-
 
 /**
  * Allocates a pbuf of the given type (possibly a chain for PBUF_POOL type).

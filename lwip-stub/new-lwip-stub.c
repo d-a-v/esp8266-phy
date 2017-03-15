@@ -88,3 +88,8 @@ void dhcp_set_ntp_servers(u8_t num_ntp_servers, ip_addr_t* ntp_server_addrs)
 	(void)ntp_server_addrs;
 	os_printf("NEW: %dx ntp server address received\n", num_ntp_servers);
 }
+
+void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, void* state)
+{
+	bufprint("TODO old2glue_oldnetif_updated\n");
+}
