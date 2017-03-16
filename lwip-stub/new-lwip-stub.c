@@ -100,7 +100,8 @@ err_t new_ipv4output (struct netif *netif, struct pbuf *p, const ip4_addr_t *ipa
 {
 	bufprint("NEW ipv4-output @%p len=%d totlen=%d type=%d\n", p, p->len, p->tot_len, p->type);
 	display_ip32("dstip=", ipaddr->addr);
-	dump("data=", p->payload, p->len);
+	bufprint("\n");
+	dump("buf", p->payload, p->len);
 	
 	return etharp_output(netif, p, ipaddr);
 }
