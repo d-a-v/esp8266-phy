@@ -7,7 +7,7 @@
 
 static int in = 0;
 static int out = 0;
-static char rotbuf[1024]; // !!! power of 2 only
+static char rotbuf[2048]; // !!! power of 2 only
 
 char bufprint_allow = 0;
 
@@ -19,7 +19,7 @@ static void printbuf (void)
 
 void bufprint (const char* format, ...)
 {
-	char buf[256];
+	char buf[512];
 	buf[0] = 0;
 	va_list ap;
 	va_start(ap, format);

@@ -42,6 +42,6 @@ typedef enum
 
 err_glue_t glue_oldcall_dhcp_start (void);
 
-void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, void* state);
+void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state);
 
 #endif // GLUE_STUB_H

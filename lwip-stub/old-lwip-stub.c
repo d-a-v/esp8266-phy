@@ -111,6 +111,8 @@ void netif_updated (struct netif* netif)
 		netif->netmask.addr,
 		netif->gw.addr,
 		glueflags,
+		netif->hwaddr_len,
+		netif->hwaddr,
 		netif->state);
 }
 
@@ -185,8 +187,26 @@ void stub_display_netif (struct netif* netif)
 	stub_display_netif_flags(netif->flags);
 }
 
+void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type)
+{
+	bufprint("WRAP: %s layer=%s(%d) len=%d type=%s(%d)\n",
+		what,
+		layer==PBUF_TRANSPORT? "transport":
+		layer==PBUF_IP? "ip":
+		layer==PBUF_LINK? "link":
+		layer==PBUF_RAW? "raw":
+		"???", (int)layer,
+		length,
+		type==PBUF_RAM? "ram":
+		type==PBUF_ROM? "rom":
+		type==PBUF_REF? "ref":
+		type==PBUF_POOL? "pool":
+		type==PBUF_ESF_RX? "esp-wlan":
+		"???", (int)type);
+}
+
 ///////////////////////////////////////
-// STUBS
+// STUBS / wrappers
 
 /**
  * Resolve and fill-in Ethernet address header for outgoing IP packet.
@@ -225,9 +245,11 @@ err_t etharp_output(struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
 err_t ethernet_input (struct pbuf *p, struct netif *netif)
 {
 	//STUB(ethernet_input);
-	bufprint("STUB: PACKET RECEIVED netif@%p len=%d totlen=%d type=%d ref=%d\n", netif, p->len, p->tot_len, p->type, p->ref);
+	pbuf_info("PACKET RECEIVED!!!", -1, p->len, p->type);
+	bufprint("STUB: PACKET RECEIVED netif@%p totlen=%d ref=%d eb=0x%p\n", netif, p->tot_len, p->ref, p->eb);
 
-	// copy data to glue pbuf
+	// copy data to glue pbuf even if its a ref
+	// so free internal blobs to avoid the BMOD "LmacRxBlk:1"
 	
 	// ...
 	
@@ -291,7 +313,9 @@ err_t dhcp_start (struct netif* netif)
 	bufprint(")\n");
 
 	netif_check(netif);
-	return glue2old_err(glue_oldcall_dhcp_start());
+
+	err_t err = glue2old_err(glue_oldcall_dhcp_start());
+	return err;
 }
 
 void dhcp_stop(struct netif *netif)
@@ -516,26 +540,14 @@ void netif_set_up(struct netif *netif)
  * @return the allocated pbuf. If multiple pbufs where allocated, this
  * is the first pbuf of a pbuf chain.
  */
+
 struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 {
 	// pbuf creation from blobs
 	// copy parts of original code matching specific requests
 
 	//STUB(pbuf_alloc);
-	bufprint("STUB: pbuf_alloc layer=%s(%d) len=%d type=%s(%d)"
-		"\n",
-		layer==PBUF_TRANSPORT? "transport":
-		layer==PBUF_IP? "ip":
-		layer==PBUF_LINK? "link":
-		layer==PBUF_RAW? "raw":
-		"???", (int)layer,
-		length,
-		type==PBUF_RAM? "ram":
-		type==PBUF_ROM? "rom":
-		type==PBUF_REF? "ref":
-		type==PBUF_POOL? "pool":
-		type==PBUF_ESF_RX? "esp-wlan":
-		"???", (int)type);
+	pbuf_info("pbuf_alloc", layer, length, type);
 	
 	u16_t offset = 0;
 	if (layer == PBUF_RAW && type == PBUF_RAM)
@@ -553,13 +565,30 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 		p->next = NULL;
 		p->type = type;
 		p->eb = NULL;
-		/* set reference count */
 		p->ref = 1;
-		/* set flags */
 		p->flags = 0;
+		bufprint("WRAP: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
+		return p;
+	}
+	
+	if (layer == PBUF_RAW && type == PBUF_REF)
+	{
+		// received packets from wlan?e :) ?
+		// real lwip get pbuf from pool XXX FIXME
 		
-		bufprint("STUB: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
-		
+		//unused: offset += EP_OFFSET;
+		uint16_t alloclen = LWIP_MEM_ALIGN_SIZE(SIZEOF_STRUCT_PBUF);
+		struct pbuf* p = (struct pbuf*)mem_malloc(alloclen);
+		if (p == NULL)
+			return NULL;
+		p->payload = NULL;
+		p->len = p->tot_len = length;
+		p->next = NULL;
+		p->type = type;
+		p->eb = NULL;
+		p->ref = 1;
+		p->flags = 0;
+		bufprint("WRAP: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
 		return p;
 	}
 
@@ -605,7 +634,9 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 u8_t pbuf_free (struct pbuf *p)
 {
 	//STUB(pbuf_free);
-	bufprint("STUB: pbuf_free(%p) ref=%d type=%d\n", p, p->ref, p->type);
+	//bufprint("WRAP: pbuf_free(%p) ref=%d type=%d\n", p, p->ref, p->type);
+	pbuf_info("pbuf_free", -1, p->len, p->type);
+	bufprint("pbuf@%p ref=%d tot_len=%d eb=0x%p\n", p, p->ref, p->tot_len, p->eb);
 	
 	#if LWIP_SUPPORT_CUSTOM_PBUF
 	#error LWIP_SUPPORT_CUSTOM_PBUF is defined
@@ -613,14 +644,11 @@ u8_t pbuf_free (struct pbuf *p)
 	
 	if (!p->next && p->ref == 1)
 	{
-		if (p->type == PBUF_RAM)
+		if (p->eb)
+			system_pp_recycle_rx_pkt(p->eb);
+		if (p->type == PBUF_RAM || p->type == PBUF_REF || p->type == PBUF_ESF_RX)
 		{
 			mem_free(p);
-			return 1;
-		}
-		if (p->type == PBUF_ESF_RX) // this is espressif specific code
-		{
-			system_pp_recycle_rx_pkt(p->eb);
 			return 1;
 		}
 	}
@@ -638,7 +666,7 @@ u8_t pbuf_free (struct pbuf *p)
 void pbuf_ref (struct pbuf *p)
 {
 	//STUB(pbuf_ref);
-	bufprint("STUB: pbuf_ref(%p) ref=%d\n", p, p->ref);
+	bufprint("WRAP: pbuf_ref(%p) ref=%d\n", p, p->ref);
 	if (p)
 		++(p->ref);
 }

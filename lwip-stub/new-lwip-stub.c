@@ -80,7 +80,10 @@ u8_t glue2new_netif_flags (glue_netif_flags_t flags)
 
 err_glue_t glue_oldcall_dhcp_start ()
 {
-	return new2glue_err(dhcp_start(netif_new));
+	bufprint("new_dhcp_start netif@%p\n", &netif_new);
+	err_t err = dhcp_start(&netif_new);
+	bufprint("new_dhcp_start returns %d\n", err);
+	return new2glue_err(err);
 }
 
 void dhcp_set_ntp_servers(u8_t num_ntp_servers, ip_addr_t* ntp_server_addrs)
@@ -92,16 +95,16 @@ void dhcp_set_ntp_servers(u8_t num_ntp_servers, ip_addr_t* ntp_server_addrs)
 err_t new_linkoutput (struct netif *netif, struct pbuf *p)
 {
 	bufprint("NEW linkoutput netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
-	dump(p->payload, p->len);
+	dump("pbuf", p->payload, p->len);
 	return ERR_ABRT;
 }
 
 err_t new_ipv4output (struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr)
 {
-	bufprint("NEW ipv4-output @%p len=%d totlen=%d type=%d\n", p, p->len, p->tot_len, p->type);
+	bufprint("NEW ipv4-output netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
 	display_ip32("dstip=", ipaddr->addr);
 	bufprint("\n");
-	dump("buf", p->payload, p->len);
+	dump("pbuf", p->payload, p->len);
 	
 	return etharp_output(netif, p, ipaddr);
 }
@@ -251,14 +254,22 @@ void setup_new_netif (void)
 		#endif /* ENABLE_LOOPBACK */
 };
 
-void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, void* state)
+void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state)
 {
+	if (hwlen > NETIF_MAX_HWADDR_LEN)
+	{
+		bufprint("ERROR hwlen>%d\n", NETIF_MAX_HWADDR_LEN);
+		hwlen = 0;
+	}
+
 	setup_new_netif();
 
 	netif_new.ip_addr.addr = ip;
 	netif_new.netmask.addr = mask;
 	netif_new.gw.addr = gw;
 	netif_new.state = state; // useless: new-lwip does not use it
+	netif_new.hwaddr_len = hwlen;
+	os_memcpy(netif_new.hwaddr, hw, hwlen);
 	netif_new.flags = glue2new_netif_flags(flags);
 	
 	// this was not done in old lwip:
