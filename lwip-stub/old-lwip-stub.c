@@ -148,15 +148,7 @@ void netif_check (struct netif* netif)
 ///////////////////////////////////////
 // helpers
 
-void stub_display_ip (const char* pre, ip_addr_t ip)
-{
-	bufprint("%s%d.%d.%d.%d",
-		pre,
-		(int)(ip.addr >> 24),
-		(int)((ip.addr >> 16) & 0xff),
-		(int)((ip.addr >> 8) & 0xff),
-		(int)(ip.addr & 0xff));
-}
+#define stub_display_ip(pre,ip) display_ip32(pre,(ip).addr)
 
 void stub_display_ip_info (struct ip_info* i)
 {
@@ -230,14 +222,20 @@ err_t etharp_output(struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
  * @param p the recevied packet, p->payload pointing to the ethernet header
  * @param netif the network interface on which the packet was received
  */
-err_t ethernet_input(struct pbuf *p, struct netif *netif)
+err_t ethernet_input (struct pbuf *p, struct netif *netif)
 {
-	(void)p; (void)netif;
 	//STUB(ethernet_input);
-	bufprint("ERROR: STUB ethernet_input should not be called\n");
+	bufprint("STUB: PACKET RECEIVED netif@%p len=%d totlen=%d type=%d ref=%d\n", netif, p->len, p->tot_len, p->type, p->ref);
+
+	// copy data to glue pbuf
+	
+	// ...
+	
+	// then release data for next incoming packets
+	pbuf_free(p);
+	
 	return ERR_ABRT;
 }
-
 
 void dhcps_start (struct ip_info *info)
 {
@@ -603,10 +601,11 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
  * 1->1->1 becomes .......
  *
  */
-u8_t pbuf_free(struct pbuf *p)
+
+u8_t pbuf_free (struct pbuf *p)
 {
 	//STUB(pbuf_free);
-	bufprint("STUB: pbuf_free(%p) ref=%d\n", p, p->ref);
+	bufprint("STUB: pbuf_free(%p) ref=%d type=%d\n", p, p->ref, p->type);
 	
 	#if LWIP_SUPPORT_CUSTOM_PBUF
 	#error LWIP_SUPPORT_CUSTOM_PBUF is defined
@@ -614,8 +613,16 @@ u8_t pbuf_free(struct pbuf *p)
 	
 	if (!p->next && p->ref == 1)
 	{
-		mem_free(p);
-		return 1;
+		if (p->type == PBUF_RAM)
+		{
+			mem_free(p);
+			return 1;
+		}
+		if (p->type == PBUF_ESF_RX) // this is espressif specific code
+		{
+			system_pp_recycle_rx_pkt(p->eb);
+			return 1;
+		}
 	}
 
 	bufprint("STUB: pbuf_free BAD CASE\n");

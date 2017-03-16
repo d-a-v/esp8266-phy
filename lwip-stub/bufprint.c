@@ -1,6 +1,7 @@
 
 #include <stdarg.h>
 #include <osapi.h>
+#include <stdint.h>
 
 #include "bufprint.h"
 
@@ -34,3 +35,35 @@ void bufprint (const char* format, ...)
 		printbuf();
 }
 
+void dump (const char* what, const char* data, size_t len)
+{
+	if (!bufprint_allow)
+	{
+		bufprint("WARN: won't dump data %s\n", what);
+		return;
+	}
+	printbuf();
+
+	size_t i, j;
+	os_printf("DUMP %s: len=%d\n", what, len);
+	for (i = 0; i < len; i += 8)
+	{
+		for (j = i; j < i + 8 && j < len; j++)
+			os_printf("0x%02x ", data[j]);
+		for (; j < i + 8; j++)
+			os_printf("     ");
+		for (j = i; j < i + 8 && j < len; j++)
+			os_printf("%c", data[j] >= 32? data[j]: '.');
+		os_printf("\n");
+	}
+}
+
+void display_ip32 (const char* pre, uint32_t ip)
+{
+	bufprint("%s%d.%d.%d.%d",
+		pre,
+		(int)(ip >> 24),
+		(int)((ip >> 16) & 0xff),
+		(int)((ip >> 8) & 0xff),
+		(int)(ip & 0xff));
+}
