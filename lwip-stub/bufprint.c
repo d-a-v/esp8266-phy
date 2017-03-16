@@ -19,6 +19,17 @@ static void printbuf (void)
 
 void bufprint (const char* format, ...)
 {
+	if (bufprint_allow)
+	{
+		printbuf();
+
+		va_list ap;
+		va_start(ap, format);
+		vprintf(format, ap);
+		va_end(ap);
+		return;
+	}
+	
 	char buf[512];
 	buf[0] = 0;
 	va_list ap;
@@ -30,9 +41,6 @@ void bufprint (const char* format, ...)
 	pbuf--;
 	while ((rotbuf[out = (out + 1) & ((sizeof rotbuf) - 1)] = *++pbuf)) ;
 	out--; // remove last 0
-	
-	if (bufprint_allow)
-		printbuf();
 }
 
 void dump (const char* what, const char* data, size_t len)

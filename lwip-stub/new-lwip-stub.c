@@ -275,3 +275,16 @@ void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_
 	// this was not done in old lwip:
 	netif_new.flags |= NETIF_FLAG_UP;
 }
+
+void glue_alloc_received (uint16_t len, void** pbuf, void** data)
+{
+	*pbuf = pbuf_alloc(PBUF_RAW, len, PBUF_RAM);
+	if (*pbuf)
+		*data = ((struct pbuf*)*pbuf)->payload;
+}
+
+err_glue_t glue_oldcall_ethernet_input (void* received)
+{
+	// allocate a ram pbuf
+	return glue2new_err(ethernet_input((struct pbuf*)received, &netif_new));
+}

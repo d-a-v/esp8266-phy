@@ -4,11 +4,13 @@
 
 #include "osapi.h"
 
+#if 0
 struct netif_glue
 {
 };
 
 extern struct netif_glue netif_glue_global;
+#endif
 
 typedef enum
 {
@@ -43,5 +45,7 @@ typedef enum
 err_glue_t glue_oldcall_dhcp_start (void);
 
 void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state);
+err_glue_t glue_oldcall_ethernet_input (void* glue_pbuf);
+void glue_alloc_received (uint16_t len, void** glue_pbuf, void** glue_data);
 
 #endif // GLUE_STUB_H

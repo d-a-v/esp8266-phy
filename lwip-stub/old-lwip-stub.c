@@ -246,17 +246,43 @@ err_t ethernet_input (struct pbuf *p, struct netif *netif)
 {
 	//STUB(ethernet_input);
 	pbuf_info("PACKET RECEIVED!!!", -1, p->len, p->type);
-	bufprint("STUB: PACKET RECEIVED netif@%p totlen=%d ref=%d eb=0x%p\n", netif, p->tot_len, p->ref, p->eb);
+	bufprint("netif@%p totlen=%d ref=%d eb=0x%p\n", netif, p->tot_len, p->ref, p->eb);
+	
+	err_t err = ERR_ABRT;
+	if (p->tot_len != p->len || p->ref != 1)
+	{
+		bufprint("ERROR: tot_len!=len or ref!=1\n");
+	}
+	else
+	{
 
-	// copy data to glue pbuf even if its a ref
-	// so free internal blobs to avoid the BMOD "LmacRxBlk:1"
+		// copy data to glue pbuf even if its a ref
+		
+		void* glue_pbuf;
+		void* glue_data;
+		// alloc buffer to copy pbuf
+		glue_alloc_received(p->len, &glue_pbuf, &glue_data);
+		if (!glue_pbuf)
+			err = ERR_MEM;
+		else
+		{
+			// copy data
+			os_memcpy(glue_data, p->payload, p->len);
+			// release blob's buffer
+			pbuf_free(p);
+			p = NULL;
+			// pass to new ip stack
+			err = glue2old_err(glue_oldcall_ethernet_input(glue_pbuf));
+			
+		}
+		// then release data to keep underlying blobbed layers free for new incoming packets
+		// thus avoiding the BMOD "LmacRxBlk:1"
+	}
 	
-	// ...
+	if (p)
+		pbuf_free(p);
 	
-	// then release data for next incoming packets
-	pbuf_free(p);
-	
-	return ERR_ABRT;
+	return err;
 }
 
 void dhcps_start (struct ip_info *info)
