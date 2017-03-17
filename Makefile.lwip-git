@@ -16,12 +16,12 @@ LWIP_SRCS = \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard core/ipv4/*.c)) \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard core/ipv6/*.c)) \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard api/*.c)) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,../../lwip-stub/new-lwip-stub.c) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,../../lwip-stub/bufprint.c) \
+	$(patsubst %.c,$(BUILD_PATH)/%.o,../../lwip-new/new-lwip-stub.c) \
+	$(patsubst %.c,$(BUILD_PATH)/%.o,../../lwip-glue/bufprint.c) \
 
-LWIP_INCLUDE = -Ibuild -I$(SDK_PATH)/include -Iinclude -I../../lwip-git-config
-BUILD_FLAGS = -Wall -Wextra -c -Os -g -Wpointer-arith -Wno-implicit-function-declaration -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
-BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC
+LWIP_INCLUDE = -Ibuild -I$(SDK_PATH)/include -Iinclude -I../../lwip-new -I../../lwip-glue
+BUILD_FLAGS = -Wall -Wextra -c -Os -g -Wpointer-arith -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
+BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC -DLWIP_REWORK
 
 CC=$(TOOLS_PATH)gcc
 AR=$(TOOLS_PATH)ar
@@ -38,12 +38,6 @@ $(LWIP_LIB): $(BUILD_PATH)/user_config.h $(LWIP_SRCS)
 	$(AR) cru $(LWIP_LIB) $(LWIP_SRCS)
 
 jall: $(LWIP_LIB)
-
-#jinstall: all
-#	cp -f $(LWIP_LIB) $(SDK_PATH)/lib/$(LWIP_LIB)
-
-#jrelease: all
-#	cp -f $(LWIP_LIB) $(SDK_PATH)/lib/liblwip_gcc.a
 
 jclean:
 	@rm -rf $(BUILD_PATH) $(LWIP_LIB) $(BUILD_PATH_STUB)

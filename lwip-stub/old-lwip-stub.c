@@ -7,10 +7,12 @@
 #include "netif/etharp.h"
 #include "lwip/mem.h"
 
-#include "glue-stub.h"
+#include "glue.h"
 #include "bufprint.h"
 
 #define STUB(x) do { bufprint("STUB: " #x "\n"); } while (0)
+
+void system_pp_recycle_rx_pkt (void*);	// espressif blobs
 
 const struct eth_addr ethbroadcast = {{0xff,0xff,0xff,0xff,0xff,0xff}};
 struct netif *netif_default;
