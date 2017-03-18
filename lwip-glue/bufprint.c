@@ -74,8 +74,8 @@ void dump (const char* what, const char* data, uint16_t len)
 		for (; j < i + 8; j++)
 			bufprint("     ");
 		for (j = i; j < i + 8 && j < len; j++)
-			bufprint("%c", data[j] >= 32? data[j]: '.');
-		os_printf("\n");
+			bufprint("%c", (data[j] >= 32 && data[j] < 127)? data[j]: '.');
+		bufprint("\n");
 	}
 }
 

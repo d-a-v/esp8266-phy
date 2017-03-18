@@ -6,7 +6,7 @@
 
 ///////////////////////////////
 //// DEBUG
-#if 0 // debug 1:on or 0
+#if 1 // debug 1:on or 0
 
 //#define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH|LWIP_DBG_HALT)
 //#define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH)
@@ -17,6 +17,9 @@
 #include "bufprint.h" // for debugging messages *before* Serial.setDebugOutput(true) called
 
 #endif // debug
+
+#define LWIP_PLATFORM_DIAG(x) do {bufprint x;} while(0)
+
 ///////////////////////////////
 //// MISSING 
 
@@ -53,7 +56,7 @@ struct ip_info {
 #define etharp_output etharp_output_STUBBED
 #define ethbroadcast ethbroadcast_STUBBED
 #define ethernet_input ethernet_input_STUBBED
-//#define lwip_init lwip_init_STUBBED				// void(void)
+#define lwip_init lwip_init_STUBBED
 #define netif_add netif_add_STUBBED
 #define netif_default netif_default_STUBBED
 #define netif_remove netif_remove_STUBBED

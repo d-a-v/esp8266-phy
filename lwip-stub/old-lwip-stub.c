@@ -104,33 +104,56 @@ glue_netif_flags_t old2glue_netif_flags (u8_t flags)
 	return gf;
 }
 
-void netif_updated (struct netif* netif)
-{
-	u8_t glueflags = old2glue_netif_flags(netif->flags);
-
-	old2glue_oldnetif_updated(
-		netif->ip_addr.addr,
-		netif->netmask.addr,
-		netif->gw.addr,
-		glueflags,
-		netif->hwaddr_len,
-		netif->hwaddr,
-		netif->state);
-}
-
-//typedef err_t (*netif_linkoutput_fn)(struct netif *netif, struct pbuf *p);
 static struct netif* old_netif = NULL;
 netif_linkoutput_fn linkoutput = NULL;
 
-err_glue_t glue2old_linkoutput (char* rawdata, uint16_t size)
+#define PBUF_CUSTOM_TYPE_STATIC 0x42
+#define PBUF_CUSTOM_NUMBER 8
+struct pbuf_wrapper
 {
-	bufprint("LINKOUTPUT: real packet sent to wildness (%dB)\n",
-		(int)size);
+	void* ref;	// for glue2new_linkoutput_pbuf_released(void*)
+	struct pbuf pbuf;
+} pbuf_wrappers[PBUF_CUSTOM_NUMBER];
+
+struct pbuf_wrapper* get_free_pbuf_wrapper (void)
+{
+	int i = 0;
+	while (i < PBUF_CUSTOM_NUMBER && pbuf_wrappers[i].ref)
+		i++;
+	if (i < PBUF_CUSTOM_NUMBER)
+		return &pbuf_wrappers[i];
+	bufprint("ERROR not enough pbuf_wrapper\n");
+	return NULL;
+}
+
+void lwip_init_STUBBED (void);
+void lwip_init (void)
+{
+	for (int i = 0; i < PBUF_CUSTOM_NUMBER; i++)
+		pbuf_wrappers[i].ref = NULL;
+	lwip_init_STUBBED();
+}
+
+err_glue_t glue2old_linkoutput (void* pbufref, char* rawdata, uint16_t size)
+{
+	// get a free pbuf wrapper
+	struct pbuf_wrapper* p = get_free_pbuf_wrapper();
+	if (!p)
+		return GLUE_ERR_ABRT;
 	
-	static struct pbuf rocket = { .payload = NULL, .len = 0, .tot_len = 0, .next = NULL, .type = PBUF_REF, .ref = 1, .flags = 0 };
-	rocket.payload = rawdata;
-	rocket.len = rocket.tot_len = size;
-	return old2glue_err(linkoutput(old_netif, &rocket));
+	// reference lwip buffer to send
+	p->ref = pbufref;
+	p->pbuf.payload = rawdata;
+	p->pbuf.len = p->pbuf.tot_len = size;
+	p->pbuf.next = NULL;
+	p->pbuf.type = PBUF_CUSTOM_TYPE_STATIC;
+	p->pbuf.ref = 0;
+	p->pbuf.flags = 0;
+
+	bufprint("LINKOUTPUT: real packet sent to wilderness (%dB %p)\n",
+		(int)size, &p->pbuf);
+	
+	return old2glue_err(linkoutput(old_netif, &p->pbuf));
 }
 
 void netif_check (struct netif* netif)
@@ -147,6 +170,17 @@ void netif_check (struct netif* netif)
 	    || netif->linkoutput != linkoutput
 	   )
 		bufprint("ERROR: bad netif invariants\n");
+
+	u8_t glueflags = old2glue_netif_flags(netif->flags);
+
+	old2glue_oldnetif_updated(
+		netif->ip_addr.addr,
+		netif->netmask.addr,
+		netif->gw.addr,
+		glueflags,
+		netif->hwaddr_len,
+		netif->hwaddr,
+		netif->state);
 }
 
 ///////////////////////////////////////
@@ -228,7 +262,7 @@ void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type
  * - ERR_RTE No route to destination (no gateway to external networks),
  * or the return type of either etharp_query() or etharp_send_ip().
  */
-err_t etharp_output(struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
+err_t etharp_output (struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
 {
 	(void)netif; (void)q; (void)ipaddr;
 	//STUB(etharp_output);
@@ -247,8 +281,9 @@ err_t etharp_output(struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
 err_t ethernet_input (struct pbuf *p, struct netif *netif)
 {
 	//STUB(ethernet_input);
-	pbuf_info("PACKET RECEIVED!!!", -1, p->len, p->type);
-	bufprint("netif@%p totlen=%d ref=%d eb=0x%p\n", netif, p->tot_len, p->ref, p->eb);
+//	pbuf_info("PACKET RECEIVED!!!", -1, p->len, p->type);
+//	bufprint("netif@%p totlen=%d ref=%d eb=%p\n", netif, p->tot_len, p->ref, p->eb);
+	netif_check(netif);
 	
 	err_t err = ERR_ABRT;
 	if (p->tot_len != p->len || p->ref != 1)
@@ -258,7 +293,7 @@ err_t ethernet_input (struct pbuf *p, struct netif *netif)
 	else
 	{
 
-		// copy data to glue pbuf even if its a ref
+		// copy data to glue pbuf even if it is a ref
 		
 		void* glue_pbuf;
 		void* glue_data;
@@ -305,13 +340,13 @@ void espconn_init (void)
 	STUB(espconn_init);
 }
 
-void dhcp_cleanup(struct netif *netif)
+void dhcp_cleanup (struct netif *netif)
 {
 	STUB(dhcp_cleanup);
 	stub_display_netif(netif); nl();
 }
 
-err_t dhcp_release(struct netif *netif)
+err_t dhcp_release (struct netif *netif)
 {
 	STUB(dhcp_release);
 	stub_display_netif(netif); nl();
@@ -346,7 +381,7 @@ err_t dhcp_start (struct netif* netif)
 	return err;
 }
 
-void dhcp_stop(struct netif *netif)
+void dhcp_stop (struct netif *netif)
 {
 	STUB(dhcp_stop);
 	stub_display_netif(netif); nl();
@@ -450,7 +485,6 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	//////////////////////////////
 
 	netif_check(netif);
-	netif_updated(netif);
 	
 	bufprint("WRAP: netif_add(ed): ");
 	stub_display_netif(netif);
@@ -490,7 +524,7 @@ void netif_set_addr (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask,
 	if (ipaddr) stub_display_ip("ip=", *ipaddr);
 	if (netmask) stub_display_ip(" mask=", *netmask);
 	if (gw) stub_display_ip(" gw=", *gw);
-	netif_updated(netif);
+	netif_check(netif);
 	stub_display_netif(netif); nl();
 }
 
@@ -506,6 +540,7 @@ void netif_set_default (struct netif *netif)
 	//stub_display_netif(netif); nl();
 	bufprint("WRAP: netif_set_default: %p\n", netif);
 	// ... yes this is default
+	netif_check(netif);
 }
 
 /**
@@ -531,10 +566,11 @@ void netif_set_down(struct netif *netif)
  * 
  * @see dhcp_start()
  */ 
-void netif_set_up(struct netif *netif)
+void netif_set_up (struct netif *netif)
 {
 	STUB(netif_set_up);
 	stub_display_netif(netif); nl();
+	netif_check(netif);
 }
 
 /**
@@ -575,7 +611,7 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 	// copy parts of original code matching specific requests
 
 	//STUB(pbuf_alloc);
-	pbuf_info("pbuf_alloc", layer, length, type);
+//	pbuf_info("pbuf_alloc", layer, length, type);
 	
 	u16_t offset = 0;
 	if (layer == PBUF_RAW && type == PBUF_RAM)
@@ -595,7 +631,7 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 		p->eb = NULL;
 		p->ref = 1;
 		p->flags = 0;
-		bufprint("WRAP: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
+//		bufprint("WRAP: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
 		return p;
 	}
 	
@@ -616,11 +652,11 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 		p->eb = NULL;
 		p->ref = 1;
 		p->flags = 0;
-		bufprint("WRAP: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
+//		bufprint("WRAP: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
 		return p;
 	}
 
-	bufprint("STUB: pbuf_alloc BAD CASE\n");
+//	bufprint("STUB: pbuf_alloc BAD CASE\n");
 		
 	return NULL;
 }
@@ -663,13 +699,27 @@ u8_t pbuf_free (struct pbuf *p)
 {
 	//STUB(pbuf_free);
 	//bufprint("WRAP: pbuf_free(%p) ref=%d type=%d\n", p, p->ref, p->type);
-	pbuf_info("pbuf_free", -1, p->len, p->type);
-	bufprint("pbuf@%p ref=%d tot_len=%d eb=0x%p\n", p, p->ref, p->tot_len, p->eb);
+//	pbuf_info("pbuf_free", -1, p->len, p->type);
+//	bufprint("pbuf@%p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
 	
 	#if LWIP_SUPPORT_CUSTOM_PBUF
 	#error LWIP_SUPPORT_CUSTOM_PBUF is defined
 	#endif
-	
+
+	if (p->type == PBUF_CUSTOM_TYPE_STATIC)
+	{
+		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)( (char*)p - ((char*)&pbuf_wrappers[0].pbuf - (char*)&pbuf_wrappers[0]) );
+		// pw->ref is the lwip2 pbuf to release, the current lwip1 pbuf points inside it
+		bufprint("WRAP: pbuf_free release lwip2 pbuf %p lwip1 %p\n", pw->ref, &pw->pbuf);
+		glue2new_pbuf_wrapper_free(pw->ref);
+		pw->ref = NULL; // release our pooled static pbuf_wrapper
+
+		if (pw->pbuf.ref != 1)
+			bufprint("ERROR bad pbuf_wrapper ref=%d\n", pw->pbuf.ref);
+		
+		return 1;
+	}
+		
 	if (!p->next && p->ref == 1)
 	{
 		if (p->eb)
@@ -682,6 +732,8 @@ u8_t pbuf_free (struct pbuf *p)
 	}
 
 	bufprint("STUB: pbuf_free BAD CASE\n");
+	pbuf_info("BAD CASE", -1, p->len, p->type);
+	bufprint("BAD CASE %p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
 	return 0;
 }
 

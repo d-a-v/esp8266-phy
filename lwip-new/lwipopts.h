@@ -1010,7 +1010,7 @@
  * LWIP_IGMP==1: Turn on IGMP module.
  */
 #if !defined LWIP_IGMP || defined __DOXYGEN__
-#define LWIP_IGMP                       0
+#define LWIP_IGMP                       1
 #endif
 #if !LWIP_IPV4
 #undef LWIP_IGMP
@@ -1437,7 +1437,7 @@
  * field.
  */
 #if !defined LWIP_NETIF_HOSTNAME || defined __DOXYGEN__
-#define LWIP_NETIF_HOSTNAME             0
+#define LWIP_NETIF_HOSTNAME             1
 #endif
 
 /**
@@ -2759,7 +2759,7 @@
  * SOCKETS_DEBUG: Enable debugging in sockets.c.
  */
 #if !defined SOCKETS_DEBUG || defined __DOXYGEN__
-#define SOCKETS_DEBUG                   LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define SOCKETS_DEBUG                   LWIP_DBG_OFF
 #endif
 
 /**
@@ -2829,7 +2829,7 @@
  * TIMERS_DEBUG: Enable debugging in timers.c.
  */
 #if !defined TIMERS_DEBUG || defined __DOXYGEN__
-#define TIMERS_DEBUG                    LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define TIMERS_DEBUG                    LWIP_DBG_OFF
 #endif
 
 /**

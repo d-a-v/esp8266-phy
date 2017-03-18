@@ -100,7 +100,13 @@ err_t new_linkoutput (struct netif *netif, struct pbuf *p)
 {
 	bufprint("NEW linkoutput netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
 	dump("pbuf", p->payload, p->len);
-	return ERR_ABRT;
+	pbuf_ref(p); // freed by glue2new_pbuf_wrapper_free() below
+	return glue2new_err(glue2old_linkoutput(p, p->payload, p->len));
+}
+
+void glue2new_pbuf_wrapper_free (void* pbuf)
+{
+	pbuf_free((struct pbuf*)pbuf);
 }
 
 err_t new_ipv4output (struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr)
@@ -108,7 +114,7 @@ err_t new_ipv4output (struct netif *netif, struct pbuf *p, const ip4_addr_t *ipa
 	bufprint("NEW ipv4-output netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
 	display_ip32("dstip=", ipaddr->addr);
 	bufprint("\n");
-	dump("pbuf", p->payload, p->len);
+	//dump("pbuf", p->payload, p->len);
 	
 	return etharp_output(netif, p, ipaddr);
 }
@@ -120,6 +126,8 @@ err_t new_input (struct pbuf *p, struct netif *inp)
 	bufprint("internal error, new-netif->input() cannot be called\n");
 	return ERR_ABRT;
 }
+
+static char hostname_sta[32];
 
 void setup_new_netif (void)
 {
@@ -184,10 +192,9 @@ void setup_new_netif (void)
 	//void* client_data[LWIP_NETIF_CLIENT_DATA_INDEX_MAX + LWIP_NUM_NETIF_CLIENT_DATA];
 	#endif
 	
-		#if LWIP_NETIF_HOSTNAME
-		#error
-		netif_new.hostname = NULL;
-		#endif /* LWIP_NETIF_HOSTNAME */
+	#if LWIP_NETIF_HOSTNAME
+	netif_new.hostname = hostname_sta;
+	#endif /* LWIP_NETIF_HOSTNAME */
 	
 	netif_new.chksum_flags = NETIF_CHECKSUM_ENABLE_ALL;
 	netif_new.mtu = TCP_MSS + 40;
@@ -228,12 +235,11 @@ void setup_new_netif (void)
 		struct stats_mib2_netif_ctrs mib2_counters;
 		#endif /* MIB2_STATS */
 
-		#if LWIP_IPV4 && LWIP_IGMP
-		#error
-		  /** This function could be called to add or delete an entry in the multicast
-		      filter table of the ethernet MAC.*/
-		  netif_igmp_mac_filter_fn igmp_mac_filter;
-		#endif /* LWIP_IPV4 && LWIP_IGMP */
+	#if LWIP_IPV4 && LWIP_IGMP
+	  /** This function could be called to add or delete an entry in the multicast
+	      filter table of the ethernet MAC.*/
+	netif_new.igmp_mac_filter = NULL;
+	#endif /* LWIP_IPV4 && LWIP_IGMP */
 
 		#if LWIP_IPV6 && LWIP_IPV6_MLD
 		#error
@@ -260,20 +266,18 @@ void setup_new_netif (void)
 
 void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state)
 {
-	if (hwlen > NETIF_MAX_HWADDR_LEN)
-	{
-		bufprint("ERROR hwlen>%d\n", NETIF_MAX_HWADDR_LEN);
-		hwlen = 0;
-	}
-
 	setup_new_netif();
 
 	netif_new.ip_addr.addr = ip;
 	netif_new.netmask.addr = mask;
 	netif_new.gw.addr = gw;
 	netif_new.state = state; // useless: new-lwip does not use it
+
+	if (hwlen != 6) bufprint("blorgl\n"); // assertme
 	netif_new.hwaddr_len = hwlen;
 	os_memcpy(netif_new.hwaddr, hw, hwlen);
+	sprintf(hostname_sta, "esp8266_%02x%02x%02x%02x%02x%02x", hw[0], hw[1], hw[2], hw[3], hw[4], hw[5]);
+
 	netif_new.flags = glue2new_netif_flags(flags);
 	
 	// this was not done in old lwip:

@@ -38,7 +38,11 @@ typedef enum
 err_glue_t glue_oldcall_dhcp_start (void);
 
 void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state);
-err_glue_t glue_oldcall_ethernet_input (void* glue_pbuf);
+err_glue_t glue_oldcall_ethernet_input (void* glue_pbuf); //XXX RENAMEME
 void glue_alloc_received (uint16_t len, void** glue_pbuf, void** glue_data);
+
+err_glue_t glue2old_linkoutput (void* pbufref, char* rawdata, uint16_t size);
+void glue2new_pbuf_wrapper_free (void* pbuf);
+
 
 #endif // GLUE_STUB_H
