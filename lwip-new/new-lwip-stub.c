@@ -98,7 +98,7 @@ void dhcp_set_ntp_servers(u8_t num_ntp_servers, const ip4_addr_t* ntp_server_add
 err_t new_linkoutput (struct netif *netif, struct pbuf *p)
 {
 	uprint("NEW linkoutput netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
-	dump("pbuf", p->payload, p->len);
+	dump("SENDING", p->payload, p->len);
 	pbuf_ref(p); // freed by glue2new_pbuf_wrapper_free() below
 	return glue2new_err(glue2old_linkoutput(p, p->payload, p->len));
 }
@@ -108,6 +108,7 @@ void glue2new_pbuf_wrapper_free (void* pbuf)
 	pbuf_free((struct pbuf*)pbuf);
 }
 
+#if 0
 err_t new_ipv4output (struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr)
 {
 	uprint("NEW ipv4-output netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
@@ -117,6 +118,7 @@ err_t new_ipv4output (struct netif *netif, struct pbuf *p, const ip4_addr_t *ipa
 	
 	return etharp_output(netif, p, ipaddr);
 }
+#endif
 
 err_t new_input (struct pbuf *p, struct netif *inp)
 {
@@ -128,11 +130,11 @@ err_t new_input (struct pbuf *p, struct netif *inp)
 
 static char hostname_sta[32];
 
-void setup_new_netif (void)
+char setup_new_netif (void)
 {
 	static char initialized = 0;
 	if (initialized)
-		return;
+		return 0;
 	initialized = 1;
 
 	#if !LWIP_SINGLE_NETIF
@@ -160,7 +162,7 @@ void setup_new_netif (void)
 		#endif /* LWIP_IPV6 */
 
 	netif_new.input = new_input;
-	netif_new.output = new_ipv4output;
+	netif_new.output = etharp_output; //new_ipv4output;
 	netif_new.linkoutput = new_linkoutput;
 
 		#if LWIP_IPV6
@@ -261,16 +263,23 @@ void setup_new_netif (void)
 		  u16_t loop_cnt_current;
 		#endif /* LWIP_LOOPBACK_MAX_PBUFS */
 		#endif /* ENABLE_LOOPBACK */
+
+	return 1;
 };
 
 void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state)
 {
-	setup_new_netif();
 
-	netif_new.ip_addr.addr = ip;
-	netif_new.netmask.addr = mask;
-	netif_new.gw.addr = gw;
-	netif_new.state = state; // useless: new-lwip does not use it
+//XXX blorgl here. netif can be updated from both side. two-way update to setup
+
+
+	if (setup_new_netif())
+	{
+		netif_new.ip_addr.addr = ip;
+		netif_new.netmask.addr = mask;
+		netif_new.gw.addr = gw;
+		netif_new.state = state; // useless: new-lwip does not use it
+	}
 
 	uassert(hwlen == 0 || hwlen == 6);
 	netif_new.hwaddr_len = hwlen;

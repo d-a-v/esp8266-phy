@@ -4,15 +4,16 @@
 
 void dump (const char* what, const char* data, uint16_t len)
 {
+	#define N 16
 	size_t i, j;
 	uprint("DUMP %s: len=%d\n", what, len);
-	for (i = 0; i < len; i += 8)
+	for (i = 0; i < len; i += N)
 	{
-		for (j = i; j < i + 8 && j < len; j++)
-			uprint("0x%02x ", data[j]);
-		for (; j < i + 8; j++)
-			uprint("     ");
-		for (j = i; j < i + 8 && j < len; j++)
+		for (j = i; j < i + N && j < len; j++)
+			uprint("%02x ", data[j]);
+		for (; j < i + N; j++)
+			uprint("   ");
+		for (j = i; j < i + N && j < len; j++)
 			uprint("%c", (data[j] >= 32 && data[j] < 127)? data[j]: '.');
 		uprint("\n");
 	}

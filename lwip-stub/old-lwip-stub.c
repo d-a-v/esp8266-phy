@@ -293,6 +293,16 @@ err_t ethernet_input (struct pbuf *p, struct netif *netif)
 
 	netif_check(netif);
 	uassert(p->tot_len == p->len && p->ref == 1);
+	
+#if UDEBUG
+	static char bcast [] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+	if (   memcmp((const char*)p->payload, netif->hwaddr, 6) == 0
+	    || memcmp((const char*)p->payload, bcast, 6) == 0)
+	{
+		dump("FOR ME", p->payload, p->len);
+	}
+#endif
+	
 
 	// copy data to glue pbuf even if it is a ref
 		

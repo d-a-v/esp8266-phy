@@ -9,16 +9,15 @@
 #if 0 // debug 1:on or 0
 
 //#define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH|LWIP_DBG_HALT)
-//#define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH)
-#define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON)
+#define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH)
+//#define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON)
 
 #define LWIP_DEBUG 1
 
-#include "bufprint.h" // for debugging messages *before* Serial.setDebugOutput(true) called
+int doprint (const char* format, ...) __attribute__ ((format (printf, 1, 2)));
+#define LWIP_PLATFORM_DIAG(x) do { doprint x;} while(0)
 
 #endif // debug
-
-#define LWIP_PLATFORM_DIAG(x) do {bufprint x;} while(0)
 
 ///////////////////////////////
 //// MISSING 
@@ -27,9 +26,9 @@
 #define LWIP_RAND r_rand	// old lwip uses this useful undocumented function
 uint32_t r_rand (void);		// esp blobs
 
-// ip_addr / ip_info: do not exist in lwip2, lwip1.4 only, used in blobs:
+// ip_addr / ip_info: do not exist in lwip2 (only in lwip1.4), but used in blobs:
 // esp8266/tools//sdk/include/user_interface.h:bool wifi_get_ip_info(uint8 if_index, struct ip_info *info);
-// copied from lwip-esp/1.4
+// hence copied from lwip-esp/1.4:
 struct ip_addr {
   uint32_t addr;
 };
@@ -38,12 +37,13 @@ struct ip_info {
     struct ip_addr netmask;
     struct ip_addr gw;
 };
+
 ///////////////////////////////
 //// STUBS
 
 //< lwip-linked-symbols-blob-list.txt sed 's,\(.*\),#define \1 \1_STUBBED,g'
 
-// these symbols must be renamed in the new implementations
+// these symbols must be renamed in the new implementation
 // because they are known/used in blobs
 
 #define dhcp_cleanup dhcp_cleanup_STUBBED

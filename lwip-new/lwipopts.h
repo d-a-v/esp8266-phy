@@ -578,7 +578,7 @@
  * packet in a row to an IP address that is not in the ARP cache.
  */
 #if !defined ARP_QUEUEING || defined __DOXYGEN__
-#define ARP_QUEUEING                    0
+#define ARP_QUEUEING                    1 // 0
 #endif
 
 /** The maximum number of packets which may be queued for each
@@ -586,7 +586,7 @@
  *  Old packets are dropped, new packets are queued.
  */
 #if !defined ARP_QUEUE_LEN || defined __DOXYGEN__
-#define ARP_QUEUE_LEN                   0 // 3
+#define ARP_QUEUE_LEN                   3 // 0 // 3
 #endif
 
 /**
@@ -860,7 +860,7 @@
  * DHCP_DOES_ARP_CHECK==1: Do an ARP check on the offered address.
  */
 #if !defined DHCP_DOES_ARP_CHECK || defined __DOXYGEN__
-#define DHCP_DOES_ARP_CHECK             ((LWIP_DHCP) && (LWIP_ARP))
+#define DHCP_DOES_ARP_CHECK             0 // ((LWIP_DHCP) && (LWIP_ARP))
 #endif
 
 /**
