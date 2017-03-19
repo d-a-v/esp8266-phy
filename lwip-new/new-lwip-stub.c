@@ -7,7 +7,6 @@
 #include "netif/ethernet.h"
 
 #include "glue.h"
-#include "bufprint.h"
 
 struct netif netif_new;
 
@@ -78,15 +77,15 @@ u8_t glue2new_netif_flags (glue_netif_flags_t flags)
 	CF(IGMP);
 	#undef CF
 	if (flags)
-		bufprint("ERROR old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
+		uerror("old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
 	return nf;
 }
 
 err_glue_t glue_oldcall_dhcp_start ()
 {
-	bufprint("new_dhcp_start netif@%p\n", &netif_new);
+	uprint("new_dhcp_start netif@%p\n", &netif_new);
 	err_t err = dhcp_start(&netif_new);
-	bufprint("new_dhcp_start returns %d\n", err);
+	uprint("new_dhcp_start returns %d\n", err);
 	return new2glue_err(err);
 }
 
@@ -98,7 +97,7 @@ void dhcp_set_ntp_servers(u8_t num_ntp_servers, const ip4_addr_t* ntp_server_add
 
 err_t new_linkoutput (struct netif *netif, struct pbuf *p)
 {
-	bufprint("NEW linkoutput netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
+	uprint("NEW linkoutput netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
 	dump("pbuf", p->payload, p->len);
 	pbuf_ref(p); // freed by glue2new_pbuf_wrapper_free() below
 	return glue2new_err(glue2old_linkoutput(p, p->payload, p->len));
@@ -111,9 +110,9 @@ void glue2new_pbuf_wrapper_free (void* pbuf)
 
 err_t new_ipv4output (struct netif *netif, struct pbuf *p, const ip4_addr_t *ipaddr)
 {
-	bufprint("NEW ipv4-output netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
+	uprint("NEW ipv4-output netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
 	display_ip32("dstip=", ipaddr->addr);
-	bufprint("\n");
+	nl();
 	//dump("pbuf", p->payload, p->len);
 	
 	return etharp_output(netif, p, ipaddr);
@@ -123,7 +122,7 @@ err_t new_input (struct pbuf *p, struct netif *inp)
 {
 	(void)p;
 	(void)inp;
-	bufprint("internal error, new-netif->input() cannot be called\n");
+	uerror("internal error, new-netif->input() cannot be called\n");
 	return ERR_ABRT;
 }
 
@@ -273,10 +272,15 @@ void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_
 	netif_new.gw.addr = gw;
 	netif_new.state = state; // useless: new-lwip does not use it
 
-	if (hwlen != 6) bufprint("blorgl\n"); // assertme
+	uassert(hwlen == 0 || hwlen == 6);
 	netif_new.hwaddr_len = hwlen;
-	os_memcpy(netif_new.hwaddr, hw, hwlen);
-	sprintf(hostname_sta, "esp8266_%02x%02x%02x%02x%02x%02x", hw[0], hw[1], hw[2], hw[3], hw[4], hw[5]);
+	if (hwlen == 6)
+	{
+		os_memcpy(netif_new.hwaddr, hw, hwlen);
+		sprintf(hostname_sta, "esp8266_%02x%02x%02x%02x%02x%02x", hw[0], hw[1], hw[2], hw[3], hw[4], hw[5]);
+	}
+	else
+		hostname_sta[0] = 0;
 
 	netif_new.flags = glue2new_netif_flags(flags);
 	

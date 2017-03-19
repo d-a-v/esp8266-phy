@@ -5,6 +5,25 @@
 #include "ets_sys.h"
 #include "osapi.h"
 
+#include "uprint.h"
+#include "doprint.h"
+
+#if 1 // DEBUG: 1=on or 0
+#define uprint(x...)	do { doprint(x); } while (0)
+#else
+#define uprint(x...)	do { (void)0; } while (0)
+#endif
+
+#define uerror(x...)	do { doprint("ERROR: " x); } while (0)
+#define uassert(ass...)	do { if ((ass) == 0) { doprint("assert fail: " #ass " @%s:%d\n", __FILE__, __LINE__); uhalt(); } } while (0)
+//#define uhalt() 	do { esp_yield(); } while (1)
+#define uhalt()		do { (void)0; } while (0)
+#define nl()		do { uprint("\n"); } while (0)
+
+#define printf uprint
+#undef os_printf
+#define os_printf uprint
+
 typedef enum
 {
 	GLUE_ERR_OK         = 0,

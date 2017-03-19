@@ -8,7 +8,7 @@ TOOLS_PATH ?= $(ESP8266)/tools/xtensa-lx106-elf/bin/xtensa-lx106-elf-
 LWIP_LIB ?= ../../liblwip_src.a
 SDK_PATH ?= $(abspath $(ESP8266)/tools/sdk)
 
-BUILD_PATH_STUB = ../lwip-stub
+BUILD_PATH_STUB = ../lwip-new ../lwip-glue
 BUILD_PATH = build
 LWIP_SRCS = \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard netif/ethernet.c)) \
@@ -16,8 +16,8 @@ LWIP_SRCS = \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard core/ipv4/*.c)) \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard core/ipv6/*.c)) \
 	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard api/*.c)) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,../../lwip-new/new-lwip-stub.c) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,../../lwip-glue/bufprint.c) \
+	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard ../../lwip-new/*.c)) \
+	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard ../../lwip-glue/*.c)) \
 
 LWIP_INCLUDE = -Ibuild -I$(SDK_PATH)/include -Iinclude -I../../lwip-new -I../../lwip-glue
 BUILD_FLAGS = -Wall -Wextra -c -Os -g -Wpointer-arith -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
