@@ -34,7 +34,7 @@ struct netif *netif_default;
 ///////////////////////////////////////
 // glue converters
 
-err_t glue2old_err (err_glue_t err)
+err_t glue2esp_err (err_glue_t err)
 {
 	switch (err)
 	{
@@ -62,7 +62,7 @@ err_t glue2old_err (err_glue_t err)
 	}
 };
 
-err_glue_t old2glue_err (err_glue_t err)
+err_glue_t esp2glue_err (err_glue_t err)
 {
 	switch (err)
 	{
@@ -87,7 +87,7 @@ err_glue_t old2glue_err (err_glue_t err)
 	}
 };
 
-glue_netif_flags_t old2glue_netif_flags (u8_t flags)
+glue_netif_flags_t esp2glue_netif_flags (u8_t flags)
 {
 	u8_t copy = flags;
 	u8_t gf = 0;
@@ -103,18 +103,21 @@ glue_netif_flags_t old2glue_netif_flags (u8_t flags)
 	#undef CF
 
 	if (flags)
-		uerror("ERROR: old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
+		uerror("ERROR: esp2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
 	return gf;
 }
 
+
+
+//static struct netif* netif_esp[2] = { NULL, NULL };
 static struct netif* netif_esp = NULL;
 netif_linkoutput_fn linkoutput = NULL;
 
-#define PBUF_CUSTOM_TYPE_STATIC 0x42
+#define PBUF_CUSTOM_TYPE_STATIC 0x42 // must not conflict with PBUF_* (pbuf types)
 #define PBUF_CUSTOM_NUMBER 8
 struct pbuf_wrapper
 {
-	void* ref;	// for glue2new_linkoutput_pbuf_released(void*)
+	void* ref;	// for glue2git_linkoutput_pbuf_released(void*)
 	struct pbuf pbuf;
 } pbuf_wrappers[PBUF_CUSTOM_NUMBER];
 
@@ -137,7 +140,7 @@ void lwip_init (void)
 	lwip_init_RENAMED();
 }
 
-err_glue_t glue2old_linkoutput (void* pbufref, char* rawdata, uint16_t size)
+err_glue_t glue2esp_linkoutput (void* ref2save, char* rawdata, uint16_t size)
 {
 	// get a free pbuf wrapper
 	struct pbuf_wrapper* p = get_free_pbuf_wrapper();
@@ -145,7 +148,7 @@ err_glue_t glue2old_linkoutput (void* pbufref, char* rawdata, uint16_t size)
 		return GLUE_ERR_ABRT;
 	
 	// reference lwip buffer to send
-	p->ref = pbufref;
+	p->ref = ref2save;
 	p->pbuf.payload = rawdata;
 	p->pbuf.len = p->pbuf.tot_len = size;
 	p->pbuf.next = NULL;
@@ -156,7 +159,7 @@ err_glue_t glue2old_linkoutput (void* pbufref, char* rawdata, uint16_t size)
 	uprint("LINKOUTPUT: real packet sent to wilderness (%dB %p)\n",
 		(int)size, &p->pbuf);
 	
-	return old2glue_err(linkoutput(netif_esp, &p->pbuf));
+	return esp2glue_err(linkoutput(netif_esp, &p->pbuf));
 }
 
 void netif_check (struct netif* netif)
@@ -181,9 +184,9 @@ void netif_check (struct netif* netif)
 		&& netif->linkoutput == linkoutput);
 #endif
 
-	u8_t glueflags = old2glue_netif_flags(netif->flags);
+	u8_t glueflags = esp2glue_netif_flags(netif->flags);
 
-	old2glue_oldnetif_updated(
+	esp2glue_netif_updated(
 		netif->ip_addr.addr,
 		netif->netmask.addr,
 		netif->gw.addr,
@@ -312,7 +315,7 @@ err_t ethernet_input (struct pbuf *p, struct netif *netif)
 	void* glue_pbuf;
 	void* glue_data;
 	// alloc buffer to copy pbuf
-	glue_alloc_received(p->len, &glue_pbuf, &glue_data);
+	esp2glue_alloc_for_recv(p->len, &glue_pbuf, &glue_data);
 	if (!glue_pbuf)
 	{
 		pbuf_free(p);
@@ -326,7 +329,7 @@ err_t ethernet_input (struct pbuf *p, struct netif *netif)
 	pbuf_free(p);
 	p = NULL;
 	// pass to new ip stack
-	return glue2old_err(glue_oldcall_ethernet_input(glue_pbuf));
+	return glue2esp_err(esp2glue_ethernet_input(glue_pbuf));
 }
 
 void dhcps_start (struct ip_info *info)
@@ -374,8 +377,6 @@ err_t dhcp_release (struct netif *netif)
  */
 err_t dhcp_start (struct netif* netif)
 {
-//	bufprint_allow = 1;
-	
 	//STUB(dhcp_start);
 
 	uprint("WRAP: dhcp_start (");
@@ -384,8 +385,7 @@ err_t dhcp_start (struct netif* netif)
 
 	netif_check(netif);
 
-	err_t err = glue2old_err(glue_oldcall_dhcp_start());
-	return err;
+	return glue2esp_err(esp2glue_dhcp_start());
 }
 
 void dhcp_stop (struct netif *netif)
@@ -718,7 +718,7 @@ u8_t pbuf_free (struct pbuf *p)
 		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)( (char*)p - ((char*)&pbuf_wrappers[0].pbuf - (char*)&pbuf_wrappers[0]) );
 		// pw->ref is the lwip2 pbuf to release, the current lwip1 pbuf points inside it
 		uprint("WRAP: pbuf_free release lwip2 pbuf %p lwip1 %p\n", pw->ref, &pw->pbuf);
-		glue2new_pbuf_wrapper_free(pw->ref);
+		esp2glue_ref_freed(pw->ref);
 		pw->ref = NULL; // release our pooled static pbuf_wrapper
 
 		if (pw->pbuf.ref != 1)
@@ -808,7 +808,7 @@ void sys_untimeout(sys_timeout_handler handler, void *arg)
 	STUB(sys_untimeout);
 }
 
-void glue_new2esp_ifup (uint32_t ip, uint32_t mask, uint32_t gw)
+void glue2esp_ifup (uint32_t ip, uint32_t mask, uint32_t gw)
 {
 	// backup old esp ips
 	ip_addr_t oldip, oldmask, oldgw;

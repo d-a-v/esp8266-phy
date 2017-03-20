@@ -11,7 +11,7 @@
 static char hostname_sta[32];
 static struct netif netif_new;
 
-err_t glue2new_err (err_glue_t err)
+err_t glue2git_err (err_glue_t err)
 {
 	switch (err)
 	{
@@ -63,7 +63,7 @@ err_glue_t new2glue_err (err_t err)
 	}
 };	
 
-u8_t glue2new_netif_flags (glue_netif_flags_t flags)
+u8_t glue2git_netif_flags (glue_netif_flags_t flags)
 {
 	glue_netif_flags_t copy = flags;
 	u8_t nf = 0;
@@ -78,7 +78,7 @@ u8_t glue2new_netif_flags (glue_netif_flags_t flags)
 	CF(IGMP);
 	#undef CF
 	if (flags)
-		uerror("ERROR: old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
+		uerror("ERROR: esp2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
 	return nf;
 }
 
@@ -95,7 +95,7 @@ static void new_display_netif_flags (int flags)
 	#undef IFF
 }
 
-err_glue_t glue_oldcall_dhcp_start ()
+err_glue_t esp2glue_dhcp_start ()
 {
 	uprint("new_dhcp_start netif@%p\n", &netif_new);
 	err_t err = dhcp_start(&netif_new);
@@ -113,11 +113,11 @@ err_t new_linkoutput (struct netif *netif, struct pbuf *p)
 {
 	uprint("NEW linkoutput netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
 	dump("SENDING", p->payload, p->len);
-	pbuf_ref(p); // freed by glue2new_pbuf_wrapper_free() below
-	return glue2new_err(glue2old_linkoutput(p, p->payload, p->len));
+	pbuf_ref(p); // freed by esp2glue_ref_freed() below
+	return glue2git_err(glue2esp_linkoutput(p, p->payload, p->len));
 }
 
-void glue2new_pbuf_wrapper_free (void* pbuf)
+void esp2glue_ref_freed (void* pbuf)
 {
 	pbuf_free((struct pbuf*)pbuf);
 }
@@ -154,7 +154,7 @@ static void netif_status_callback (struct netif* netif)
 	if (netif->flags & NETIF_FLAG_LINK_UP)
 	{
 		// tell ESP that link is up
-		glue_new2esp_ifup(netif->ip_addr.addr, netif->netmask.addr, netif->gw.addr);
+		glue2esp_ifup(netif->ip_addr.addr, netif->netmask.addr, netif->gw.addr);
 
 		// this is our default route
 		netif_set_default(netif);
@@ -297,7 +297,7 @@ static char setup_new_netif (void)
 	return 1;
 };
 
-void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state)
+void esp2glue_netif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state)
 {
 
 //XXX blorgl here. netif can be updated from both side. two-way update to setup
@@ -311,7 +311,7 @@ void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_
 	}
 	// LINK_UP is always brought by ESP
 	// but it is really set once netif's status callback is called
-	netif_new.flags = glue2new_netif_flags(flags);
+	netif_new.flags = glue2git_netif_flags(flags);
 
 	if (netif_new.hwaddr_len != 6)
 	{
@@ -334,15 +334,14 @@ void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_
 	nl();
 }
 
-void glue_alloc_received (uint16_t len, void** pbuf, void** data)
+void esp2glue_alloc_for_recv (uint16_t len, void** pbuf, void** data)
 {
 	*pbuf = pbuf_alloc(PBUF_RAW, len, PBUF_RAM);
 	if (*pbuf)
 		*data = ((struct pbuf*)*pbuf)->payload;
 }
 
-err_glue_t glue_oldcall_ethernet_input (void* received)
+err_glue_t esp2glue_ethernet_input (void* received)
 {
-	// allocate a ram pbuf
 	return new2glue_err(ethernet_input((struct pbuf*)received, &netif_new));
 }
