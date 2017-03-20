@@ -4,22 +4,20 @@ LWIP_LIB ?= liblwip_src.a
 SDK_PATH ?= $(abspath ../esp8266/tools/sdk)
 ESP_LWIP ?= $(SDK_PATH)/lwip
 
+all clean: prepare
+	make -f Makefile.lwip-esp $@
+	make -f Makefile.lwip-git $@
+
 prepare:
 	test -r $(ESP_LWIP) && { test -L $(ESP_LWIP) || mv $(ESP_LWIP) $(ESP_LWIP).orig; } || true
-
-all clean: prepare
-	make -f Makefile.lwip-stub $@
-	make -f Makefile.lwip-git $@
 
 install release: all
 	test -f $(LWIP_LIB_RELEASE).orig || cp $(LWIP_LIB_RELEASE) $(LWIP_LIB_RELEASE).orig
 	cp -f $(LWIP_LIB) $(LWIP_LIB_RELEASE)
-	rm -f $(ESP_LWIP); ln -sf $(abspath lwip-git) $(ESP_LWIP)
-	rm -f lwip-git/src/include/arch; ln -sf $(abspath lwip-new/arch) lwip-git/src/include
-	rm -f lwip-git/include; ln -sf src/include lwip-git/include
-	ln -sf $(abspath lwip-new/lwipopts.h) lwip-git/src/include
-	ln -sf $(abspath lwip-glue/bufprint.h) lwip-git/src/include
-	
+	rm -f $(ESP_LWIP); ln -sf $(abspath lwip-git-src) $(ESP_LWIP)
+	rm -f lwip-git-src/src/include/arch; ln -sf $(abspath lwip-git/arch) lwip-git-src/src/include
+	rm -f lwip-git-src/include; ln -sf src/include lwip-git-src/include
+	ln -sf $(abspath lwip-git/lwipopts.h) lwip-git-src/src/include
 
 try: all install
 
