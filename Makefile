@@ -5,7 +5,7 @@ SDK_PATH ?= $(abspath ../esp8266/tools/sdk)
 ESP_LWIP ?= $(SDK_PATH)/lwip
 
 prepare:
-	test -L $(ESP_LWIP) || mv $(ESP_LWIP) $(ESP_LWIP).orig
+	test -r $(ESP_LWIP) && { test -L $(ESP_LWIP) || mv $(ESP_LWIP) $(ESP_LWIP).orig; } || true
 
 all clean: prepare
 	make -f Makefile.lwip-stub $@

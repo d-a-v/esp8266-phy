@@ -4,7 +4,7 @@
 #include "ets_sys.h"
 #include "osapi.h"
 
-typedef int sys_prot_t;
+typedef int sys_prot_t;	// not really used
 #define SYS_ARCH_DECL_PROTECT(lev)
 #define SYS_ARCH_PROTECT(lev) os_intr_lock()
 #define SYS_ARCH_UNPROTECT(lev) os_intr_unlock()
@@ -32,8 +32,7 @@ int doprint (const char* format, ...) __attribute__ ((format (printf, 1, 2)));
 uint32_t r_rand (void);		// esp blobs
 
 // ip_addr / ip_info: do not exist in lwip2 (only in lwip1.4), but used in blobs:
-// esp8266/tools//sdk/include/user_interface.h:bool wifi_get_ip_info(uint8 if_index, struct ip_info *info);
-// hence copied from lwip-esp/1.4:
+// esp8266/tools/sdk/include/user_interface.h:bool wifi_get/set_ip_info(uint8 if_index, struct ip_info *info);
 struct ip_addr {
   uint32_t addr;
 };

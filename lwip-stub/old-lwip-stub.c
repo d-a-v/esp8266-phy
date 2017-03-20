@@ -14,7 +14,7 @@
 #define STUB(x) do { uerror("STUB: " #x "\n"); } while (0)
 
 void system_pp_recycle_rx_pkt (void*);					// guessed interface, esp blobs
-void system_station_got_ip_set(u32_t* ip, u32_t* mask, u32_t* gw);	// guessed interface, esp blobs
+void system_station_got_ip_set(ip_addr_t* ip, ip_addr_t* mask, ip_addr_t* gw);	// guessed interface, esp blobs
 
 const struct eth_addr ethbroadcast = {{0xff,0xff,0xff,0xff,0xff,0xff}};
 struct netif *netif_default;
@@ -201,7 +201,7 @@ void netif_check (struct netif* netif)
 static void stub_display_ip_info (const struct ip_info* i)
 {
 	stub_display_ip("ip=", i->ip);
-	stub_display_ip(" mask=", i->gw);
+	stub_display_ip(" mask=", i->netmask);
 	stub_display_ip(" gw=", i->gw);
 }
 
@@ -810,39 +810,19 @@ void sys_untimeout(sys_timeout_handler handler, void *arg)
 
 void glue_new2esp_ifup (uint32_t ip, uint32_t mask, uint32_t gw)
 {
+	// backup old esp ips
+	ip_addr_t oldip, oldmask, oldgw;
+	oldip = netif_esp->ip_addr;
+	oldmask = netif_esp->netmask;
+	oldgw = netif_esp->gw;
+	        
+	// change ips
 	netif_esp->ip_addr.addr = ip;
 	netif_esp->netmask.addr = mask;
 	netif_esp->gw.addr = gw;
-	system_station_got_ip_set(&netif_esp->ip_addr.addr, &netif_esp->netmask.addr, &netif_esp->gw.addr);
+	// set up
+	netif_esp->flags |= NETIF_FLAG_UP;
 
-	struct ip_info got;
-	got.ip.addr = ip;
-	got.netmask.addr = mask;
-	got.gw.addr = gw;
-
-struct ip_info test0;
-test0.ip.addr = 0x42424242;
-test0.netmask.addr = 0x42424242;
-test0.gw.addr = 0x42424242;
-wifi_get_ip_info(STATION_IF, &test0);
-uprint("TEST: ");
-stub_display_ip_info(&test0);
-uprint("\n");
-
-uprint("SET1: ");
-stub_display_ip_info(&got);
-uprint("\n");
-	wifi_set_ip_info(STATION_IF, &got);
-uprint("SET2: ");
-stub_display_ip_info(&got);
-uprint("\n");
-	
-struct ip_info test;
-test.ip.addr = 0x42424242;
-test.netmask.addr = 0x42424242;
-test.gw.addr = 0x42424242;
-wifi_get_ip_info(STATION_IF, &test);
-uprint("TEST: ");
-stub_display_ip_info(&test);
-uprint("\n");
+	// tell esp to check it has changed (by giving old ones)
+	system_station_got_ip_set(&oldip, &oldmask, &oldgw);
 }
