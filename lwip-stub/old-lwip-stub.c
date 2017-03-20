@@ -7,11 +7,14 @@
 #include "netif/etharp.h"
 #include "lwip/mem.h"
 
+#include "user_interface.h"
+
 #include "glue.h"
 
-#define STUB(x) do { uprint("STUB: " #x "\n"); } while (0)
+#define STUB(x) do { uerror("STUB: " #x "\n"); } while (0)
 
-void system_pp_recycle_rx_pkt (void*);	// espressif blobs
+void system_pp_recycle_rx_pkt (void*);					// guessed interface, esp blobs
+void system_station_got_ip_set(u32_t* ip, u32_t* mask, u32_t* gw);	// guessed interface, esp blobs
 
 const struct eth_addr ethbroadcast = {{0xff,0xff,0xff,0xff,0xff,0xff}};
 struct netif *netif_default;
@@ -100,11 +103,11 @@ glue_netif_flags_t old2glue_netif_flags (u8_t flags)
 	#undef CF
 
 	if (flags)
-		uerror("old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
+		uerror("ERROR: old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
 	return gf;
 }
 
-static struct netif* old_netif = NULL;
+static struct netif* netif_esp = NULL;
 netif_linkoutput_fn linkoutput = NULL;
 
 #define PBUF_CUSTOM_TYPE_STATIC 0x42
@@ -122,16 +125,16 @@ struct pbuf_wrapper* get_free_pbuf_wrapper (void)
 		i++;
 	if (i < PBUF_CUSTOM_NUMBER)
 		return &pbuf_wrappers[i];
-	uerror("not enough pbuf_wrapper\n");
+	uerror("ERROR: not enough pbuf_wrapper\n");
 	return NULL;
 }
 
-void lwip_init_STUBBED (void);
+void lwip_init_RENAMED (void);
 void lwip_init (void)
 {
 	for (int i = 0; i < PBUF_CUSTOM_NUMBER; i++)
 		pbuf_wrappers[i].ref = NULL;
-	lwip_init_STUBBED();
+	lwip_init_RENAMED();
 }
 
 err_glue_t glue2old_linkoutput (void* pbufref, char* rawdata, uint16_t size)
@@ -153,26 +156,26 @@ err_glue_t glue2old_linkoutput (void* pbufref, char* rawdata, uint16_t size)
 	uprint("LINKOUTPUT: real packet sent to wilderness (%dB %p)\n",
 		(int)size, &p->pbuf);
 	
-	return old2glue_err(linkoutput(old_netif, &p->pbuf));
+	return old2glue_err(linkoutput(netif_esp, &p->pbuf));
 }
 
 void netif_check (struct netif* netif)
 {
-	if (!old_netif)
+	if (!netif_esp)
 	{
-		old_netif = netif;
+		netif_esp = netif;
 		linkoutput = netif->linkoutput;
 	}
 
 #if 0
-	if (   netif != old_netif
+	if (   netif != netif_esp
 	    || netif->input != ethernet_input
 	    || netif->output != etharp_output
 	    || netif->linkoutput != linkoutput
 	   )
-		uerror("bad netif invariants\n");
+		uerror("ERROR: bad netif invariants\n");
 #else
-	uassert(   netif == old_netif
+	uassert(   netif == netif_esp
 		&& netif->input == ethernet_input
 		&& netif->output == etharp_output
 		&& netif->linkoutput == linkoutput);
@@ -195,16 +198,16 @@ void netif_check (struct netif* netif)
 
 #define stub_display_ip(pre,ip) display_ip32(pre,(ip).addr)
 
-void stub_display_ip_info (struct ip_info* i)
+static void stub_display_ip_info (const struct ip_info* i)
 {
 	stub_display_ip("ip=", i->ip);
 	stub_display_ip(" mask=", i->gw);
 	stub_display_ip(" gw=", i->gw);
 }
 
-void stub_display_netif_flags (int flags)
+static void stub_display_netif_flags (int flags)
 {
-	#define IFF(x)	do { if (flags & NETIF_FLAG_##x) uprint("|" #x); } while (0)
+	#define IFF(x)	do { if (flags & NETIF_FLAG_##x) uerror("|" #x); } while (0)
 	IFF(UP);
 	IFF(BROADCAST);
 	IFF(POINTTOPOINT);
@@ -216,9 +219,9 @@ void stub_display_netif_flags (int flags)
 	#undef IFF
 }
 
-void stub_display_netif (struct netif* netif)
+static void stub_display_netif (struct netif* netif)
 {
-	uprint("@%p name=%c%c idx=%d mtu=%d state=%p " /*"input=%p output=%p"*/ "linkout=%p flags=",
+	uerror("@%p name=%c%c idx=%d mtu=%d state=%p " /*"input=%p output=%p"*/ "linkout=%p flags=",
 		netif,
 		netif->name[0], netif->name[1],
 		netif->num,
@@ -232,7 +235,7 @@ void stub_display_netif (struct netif* netif)
 
 void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type)
 {
-	uprint("WRAP: %s layer=%s(%d) len=%d type=%s(%d)\n",
+	uerror("WRAP: %s layer=%s(%d) len=%d type=%s(%d)\n",
 		what,
 		layer==PBUF_TRANSPORT? "transport":
 		layer==PBUF_IP? "ip":
@@ -273,7 +276,7 @@ err_t etharp_output (struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
 {
 	(void)netif; (void)q; (void)ipaddr;
 	//STUB(etharp_output);
-	uerror("STUB etharp_output should not be called\n");
+	uerror("ERROR: STUB etharp_output should not be called\n");
 	return ERR_ABRT;
 }
                    
@@ -735,9 +738,8 @@ u8_t pbuf_free (struct pbuf *p)
 		}
 	}
 
-	uprint("STUB: pbuf_free BAD CASE\n");
+	uerror("BAD CASE %p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
 	pbuf_info("BAD CASE", -1, p->len, p->type);
-	uprint("BAD CASE %p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
 	return 0;
 }
 
@@ -806,3 +808,41 @@ void sys_untimeout(sys_timeout_handler handler, void *arg)
 	STUB(sys_untimeout);
 }
 
+void glue_new2esp_ifup (uint32_t ip, uint32_t mask, uint32_t gw)
+{
+	netif_esp->ip_addr.addr = ip;
+	netif_esp->netmask.addr = mask;
+	netif_esp->gw.addr = gw;
+	system_station_got_ip_set(&netif_esp->ip_addr.addr, &netif_esp->netmask.addr, &netif_esp->gw.addr);
+
+	struct ip_info got;
+	got.ip.addr = ip;
+	got.netmask.addr = mask;
+	got.gw.addr = gw;
+
+struct ip_info test0;
+test0.ip.addr = 0x42424242;
+test0.netmask.addr = 0x42424242;
+test0.gw.addr = 0x42424242;
+wifi_get_ip_info(STATION_IF, &test0);
+uprint("TEST: ");
+stub_display_ip_info(&test0);
+uprint("\n");
+
+uprint("SET1: ");
+stub_display_ip_info(&got);
+uprint("\n");
+	wifi_set_ip_info(STATION_IF, &got);
+uprint("SET2: ");
+stub_display_ip_info(&got);
+uprint("\n");
+	
+struct ip_info test;
+test.ip.addr = 0x42424242;
+test.netmask.addr = 0x42424242;
+test.gw.addr = 0x42424242;
+wifi_get_ip_info(STATION_IF, &test);
+uprint("TEST: ");
+stub_display_ip_info(&test);
+uprint("\n");
+}

@@ -23,8 +23,8 @@ void display_ip32 (const char* pre, uint32_t ip)
 {
 	uprint("%s%d.%d.%d.%d",
 		pre,
-		(int)(ip >> 24),
-		(int)((ip >> 16) & 0xff),
+		(int)(ip & 0xff),
 		(int)((ip >> 8) & 0xff),
-		(int)(ip & 0xff));
+		(int)((ip >> 16) & 0xff),
+		(int)(ip >> 24));
 }

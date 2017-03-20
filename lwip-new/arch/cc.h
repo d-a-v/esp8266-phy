@@ -1,5 +1,5 @@
-#ifndef LWIP_STUBBED_SYMBOLS_H
-#define LWIP_STUBBED_SYMBOLS_H
+#ifndef LWIP2_ARCH_CC_H
+#define LWIP2_ARCH_CC_H
 
 #include "ets_sys.h"
 #include "osapi.h"
@@ -41,48 +41,39 @@ struct ip_info {
 ///////////////////////////////
 //// STUBS
 
-//< lwip-linked-symbols-blob-list.txt sed 's,\(.*\),#define \1 \1_STUBBED,g'
+//< lwip-linked-symbols-blob-list.txt sed 's,\(.*\),#define \1 \1_RENAMED,g'
 
 // these symbols must be renamed in the new implementation
 // because they are known/used in blobs
 
-#define dhcp_cleanup dhcp_cleanup_STUBBED
-#define dhcp_release dhcp_release_STUBBED
-#define dhcp_start dhcp_start_STUBBED
-#define dhcp_stop dhcp_stop_STUBBED
-#define dhcps_start dhcps_start_STUBBED
-#define dhcps_stop dhcps_stop_STUBBED
-#define espconn_init espconn_init_STUBBED
-#define etharp_output etharp_output_STUBBED
-#define ethbroadcast ethbroadcast_STUBBED
-#define ethernet_input ethernet_input_STUBBED
-#define lwip_init lwip_init_STUBBED
-#define netif_add netif_add_STUBBED
-#define netif_default netif_default_STUBBED
-#define netif_remove netif_remove_STUBBED
-#define netif_set_addr netif_set_addr_STUBBED
-#define netif_set_default netif_set_default_STUBBED
-#define netif_set_down netif_set_down_STUBBED
-#define netif_set_up netif_set_up_STUBBED
-#define pbuf_alloc pbuf_alloc_STUBBED
-#define pbuf_free pbuf_free_STUBBED
-#define pbuf_ref pbuf_ref_STUBBED
-//#define sys_check_timeouts sys_check_timeouts_STUBBED		// void(void)
+#define dhcp_cleanup dhcp_cleanup_RENAMED
+#define dhcp_release dhcp_release_RENAMED
+#define dhcp_start dhcp_start_RENAMED
+#define dhcp_stop dhcp_stop_RENAMED
+#define dhcps_start dhcps_start_RENAMED
+#define dhcps_stop dhcps_stop_RENAMED
+#define espconn_init espconn_init_RENAMED
+#define etharp_output etharp_output_RENAMED
+#define ethbroadcast ethbroadcast_RENAMED
+#define ethernet_input ethernet_input_RENAMED
+#define lwip_init lwip_init_RENAMED
+#define netif_add netif_add_RENAMED
+#define netif_default netif_default_RENAMED
+#define netif_remove netif_remove_RENAMED
+#define netif_set_addr netif_set_addr_RENAMED
+#define netif_set_default netif_set_default_RENAMED
+#define netif_set_down netif_set_down_RENAMED
+#define netif_set_up netif_set_up_RENAMED
+#define pbuf_alloc pbuf_alloc_RENAMED
+#define pbuf_free pbuf_free_RENAMED
+#define pbuf_ref pbuf_ref_RENAMED
+//#define sys_check_timeouts sys_check_timeouts_RENAMED		// void(void)
 
 #ifndef LWIP_DEBUG
-#define sys_timeout sys_timeout_STUBBED
+#define sys_timeout sys_timeout_RENAMED
 #endif
 
-#define sys_untimeout sys_untimeout_STUBBED
+#define sys_untimeout sys_untimeout_RENAMED
 
 ///////////////////////////////
-//// REWORK
-#ifndef LWIP_REWORK
-
-//#define dns_gethostbyname_addrtype	reworked_dns_gethostbyname_addrtype
-//#define dns_gethostbyname		reworked_dns_gethostbyname
-//#define ip_addr_t ip4_addr_t
-
-#endif // LWIP_REWORK
-///////////////////////////////
-#endif // LWIP_STUBBED_SYMBOLS_H
+#endif // LWIP2_ARCH_CC_H

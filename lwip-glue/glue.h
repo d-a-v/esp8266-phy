@@ -8,7 +8,7 @@
 #include "uprint.h"
 #include "doprint.h"
 
-#define UDEBUG 0	// 0 or 1
+#define UDEBUG 1	// 0 or 1
 
 #if UDEBUG
 #define uprint(x...)	do { doprint(x); } while (0)
@@ -16,7 +16,7 @@
 #define uprint(x...)	do { (void)0; } while (0)
 #endif
 
-#define uerror(x...)	do { doprint("ERROR: " x); } while (0)
+#define uerror(x...)	do { doprint(x); } while (0)
 #define uassert(ass...)	do { if ((ass) == 0) { doprint("assert fail: " #ass " @%s:%d\n", __FILE__, __LINE__); uhalt(); } } while (0)
 //#define uhalt() 	do { esp_yield(); } while (1)
 #define uhalt()		do { (void)0; } while (0)
@@ -65,5 +65,6 @@ void glue_alloc_received (uint16_t len, void** glue_pbuf, void** glue_data);
 err_glue_t glue2old_linkoutput (void* pbufref, char* rawdata, uint16_t size);
 void glue2new_pbuf_wrapper_free (void* pbuf);
 
+void glue_new2esp_ifup (uint32_t ip, uint32_t mask, uint32_t gw);
 
 #endif // GLUE_STUB_H

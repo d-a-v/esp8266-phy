@@ -8,7 +8,8 @@
 
 #include "glue.h"
 
-struct netif netif_new;
+static char hostname_sta[32];
+static struct netif netif_new;
 
 err_t glue2new_err (err_glue_t err)
 {
@@ -77,8 +78,21 @@ u8_t glue2new_netif_flags (glue_netif_flags_t flags)
 	CF(IGMP);
 	#undef CF
 	if (flags)
-		uerror("old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
+		uerror("ERROR: old2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
 	return nf;
+}
+
+static void new_display_netif_flags (int flags)
+{
+	#define IFF(x)	do { if (flags & NETIF_FLAG_##x) uerror("|" #x); } while (0)
+	IFF(UP);
+	IFF(BROADCAST);
+	IFF(LINK_UP);
+	IFF(ETHARP);
+	IFF(ETHERNET);
+	IFF(IGMP);
+	IFF(MLD6);
+	#undef IFF
 }
 
 err_glue_t glue_oldcall_dhcp_start ()
@@ -120,7 +134,7 @@ err_t new_ipv4output (struct netif *netif, struct pbuf *p, const ip4_addr_t *ipa
 }
 #endif
 
-err_t new_input (struct pbuf *p, struct netif *inp)
+static err_t new_input (struct pbuf *p, struct netif *inp)
 {
 	(void)p;
 	(void)inp;
@@ -128,9 +142,21 @@ err_t new_input (struct pbuf *p, struct netif *inp)
 	return ERR_ABRT;
 }
 
-static char hostname_sta[32];
+static void netif_status_callback (struct netif* netif)
+{
+	uprint("NEW: netif status callback: flags=");
+	new_display_netif_flags(netif->flags);
+	display_ip32(" ip=", netif->ip_addr.addr);
+	display_ip32(" mask=", netif->netmask.addr);
+	display_ip32(" gw=", netif->gw.addr);
+	uprint("\n");
+	
+	if (netif->flags & NETIF_FLAG_LINK_UP)
+		// tell ESP that link is up
+		glue_new2esp_ifup(netif->ip_addr.addr, netif->netmask.addr, netif->gw.addr);
+}
 
-char setup_new_netif (void)
+static char setup_new_netif (void)
 {
 	static char initialized = 0;
 	if (initialized)
@@ -170,10 +196,9 @@ char setup_new_netif (void)
 		netif_new.output_ip6 = blah
 		#endif /* LWIP_IPV6 */
 
-		#if LWIP_NETIF_STATUS_CALLBACK
-		#error
-		netif_new.status_callback = blah
-		#endif /* LWIP_NETIF_STATUS_CALLBACK */
+	#if LWIP_NETIF_STATUS_CALLBACK
+	netif_new.status_callback = netif_status_callback;
+	#endif /* LWIP_NETIF_STATUS_CALLBACK */
 
 		#if LWIP_NETIF_LINK_CALLBACK
 		#error
@@ -272,7 +297,6 @@ void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_
 
 //XXX blorgl here. netif can be updated from both side. two-way update to setup
 
-
 	if (setup_new_netif())
 	{
 		netif_new.ip_addr.addr = ip;
@@ -280,21 +304,29 @@ void old2glue_oldnetif_updated (uint32_t ip, uint32_t mask, uint32_t gw, uint16_
 		netif_new.gw.addr = gw;
 		netif_new.state = state; // useless: new-lwip does not use it
 	}
-
-	uassert(hwlen == 0 || hwlen == 6);
-	netif_new.hwaddr_len = hwlen;
-	if (hwlen == 6)
-	{
-		os_memcpy(netif_new.hwaddr, hw, hwlen);
-		sprintf(hostname_sta, "esp8266_%02x%02x%02x%02x%02x%02x", hw[0], hw[1], hw[2], hw[3], hw[4], hw[5]);
-	}
-	else
-		hostname_sta[0] = 0;
-
+	// LINK_UP is always brought by ESP
+	// but it is really set once netif's status callback is called
 	netif_new.flags = glue2new_netif_flags(flags);
+
+	if (netif_new.hwaddr_len != 6)
+	{
+		uassert(hwlen == 0 || hwlen == 6);
+		netif_new.hwaddr_len = hwlen;
+		if (hwlen == 6)
+		{
+			os_memcpy(netif_new.hwaddr, hw, hwlen);
+			sprintf(hostname_sta, "esp8266_%02x%02x%02x%02x%02x%02x", hw[0], hw[1], hw[2], hw[3], hw[4], hw[5]);
+		}
+		else
+			hostname_sta[0] = 0;
+	}
 	
-	// this was not done in old lwip:
+	// this was not done in old lwip and is needed for dhcp
 	netif_new.flags |= NETIF_FLAG_UP;
+	
+	uprint("NEW: netif set up by ESP: flags=");
+	new_display_netif_flags(netif_new.flags);
+	nl();
 }
 
 void glue_alloc_received (uint16_t len, void** pbuf, void** data)
