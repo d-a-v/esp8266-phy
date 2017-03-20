@@ -377,6 +377,8 @@ err_t dhcp_release (struct netif *netif)
  */
 err_t dhcp_start (struct netif* netif)
 {
+	doprint_allow = 1;
+	
 	//STUB(dhcp_start);
 
 	uprint("WRAP: dhcp_start (");
