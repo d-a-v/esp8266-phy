@@ -152,8 +152,13 @@ static void netif_status_callback (struct netif* netif)
 	uprint("\n");
 	
 	if (netif->flags & NETIF_FLAG_LINK_UP)
+	{
 		// tell ESP that link is up
 		glue_new2esp_ifup(netif->ip_addr.addr, netif->netmask.addr, netif->gw.addr);
+
+		// this is our default route
+		netif_set_default(netif);
+	}
 }
 
 static char setup_new_netif (void)
