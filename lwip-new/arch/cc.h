@@ -4,6 +4,11 @@
 #include "ets_sys.h"
 #include "osapi.h"
 
+typedef int sys_prot_t;
+#define SYS_ARCH_DECL_PROTECT(lev)
+#define SYS_ARCH_PROTECT(lev) os_intr_lock()
+#define SYS_ARCH_UNPROTECT(lev) os_intr_unlock()
+
 ///////////////////////////////
 //// DEBUG
 #if 0 // debug 1:on or 0
