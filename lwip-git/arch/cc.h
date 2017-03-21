@@ -43,6 +43,13 @@ struct ip_info {
 };
 
 ///////////////////////////////
+//// PROVIDED TO USER
+
+typedef struct ip4_addr ip4_addr_t;
+extern int ntp_servers_number;
+extern ip4_addr_t* ntp_servers;
+
+///////////////////////////////
 //// STUBS
 
 //< lwip-linked-symbols-blob-list.txt sed 's,\(.*\),#define \1 \1_RENAMED,g'

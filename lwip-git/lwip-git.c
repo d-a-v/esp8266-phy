@@ -16,6 +16,9 @@ static struct netif netif_git[2];
 static int netif_git_initialized[2] = { 0, 0 }; //XXX or char?
 static const char netif_name[2][8] = { "station", "soft-ap" };
 
+int ntp_servers_number = 0;
+ip4_addr_t* ntp_servers = NULL;
+
 err_t glue2git_err (err_glue_t err)
 {
 	switch (err)
@@ -112,10 +115,34 @@ err_glue_t esp2glue_dhcp_start ()
 	return new2glue_err(err);
 }
 
-void dhcp_set_ntp_servers (u8_t num_ntp_servers, const ip4_addr_t* ntp_server_addrs)
+void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
 {
-	(void)ntp_server_addrs;
-	uprint("GLUE: %dx ntp server address received\n", num_ntp_servers);
+	uprint("GLUE: %d ntp-server known\n", number);
+	if (ntp_servers)
+		mem_free(ntp_servers);
+	if (!number)
+	{
+		ntp_servers = NULL;
+		ntp_servers_number = 0;
+		return;
+	}
+	size_t size = number * sizeof(ip4_addr_t);
+	ntp_servers = mem_malloc(size);
+	if (!ntp_servers)
+	{
+		uerror("ERROR alloc(%d) failed for %d ntp server address\n", (int)size, number);
+		ntp_servers_number = 0;
+		return;
+	}
+	ntp_servers_number = number;
+	os_memcpy(ntp_servers, ntp_server_addrs, size);
+#if UDEBUG
+	for (int i = 0; i < number; i++)
+	{
+		display_ip32("ntp: ", ntp_servers[i].addr);
+		nl();
+	}
+#endif
 }
 
 err_t new_linkoutput (struct netif *netif, struct pbuf *p)
@@ -306,12 +333,11 @@ static char setup_netif (int netif_idx)
 	return 1;
 };
 
-void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state)
+void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, uint32_t flags, uint32_t hwlen, const uint8_t* hw, void* state)
 {
 
 //XXX blorgl here. netif can be updated from both side. two-way update to setup
 
-uprint("2idx=%d\n", netif_idx);
 	struct netif* netif = &netif_git[netif_idx];
 	if (setup_netif(netif_idx))
 	{
@@ -343,7 +369,7 @@ uprint("2idx=%d\n", netif_idx);
 	nl();
 }
 
-void esp2glue_alloc_for_recv (uint16_t len, void** pbuf, void** data)
+void esp2glue_alloc_for_recv (size_t len, void** pbuf, void** data)
 {
 	*pbuf = pbuf_alloc(PBUF_RAW, len, PBUF_RAM);
 	if (*pbuf)

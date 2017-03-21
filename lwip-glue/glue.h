@@ -57,11 +57,11 @@ typedef enum
 } glue_netif_flags_t;
 
 err_glue_t	esp2glue_dhcp_start	(void);
-void		esp2glue_netif_updated	(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state);
+void		esp2glue_netif_updated	(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, uint32_t flags, size_t hwlen, const uint8_t* hw, void* state);
 err_glue_t	esp2glue_ethernet_input	(int netif_idx, void* glue_pbuf);
-void		esp2glue_alloc_for_recv	(uint16_t len, void** glue_pbuf, void** glue_data);
+void		esp2glue_alloc_for_recv	(size_t len, void** glue_pbuf, void** glue_data);
 
-err_glue_t	glue2esp_linkoutput	(int netif_idx, void* ref2save, char* rawdata, uint16_t size);
+err_glue_t	glue2esp_linkoutput	(int netif_idx, void* ref2save, char* rawdata, size_t size);
 void		esp2glue_ref_freed	(void* ref_saved);
 
 void		glue2esp_ifup		(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw);

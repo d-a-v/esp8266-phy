@@ -203,7 +203,7 @@ struct pbuf_wrapper* get_free_pbuf_wrapper (void)
 }
 
 // output real packet here:
-err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, char* rawdata, uint16_t size)
+err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, char* rawdata, size_t size)
 {
 	// get a free pbuf wrapper
 	struct pbuf_wrapper* p = get_free_pbuf_wrapper();
@@ -590,7 +590,8 @@ void netif_set_default (struct netif *netif)
  */ 
 void netif_set_down(struct netif *netif)
 {
-	STUB(netif_set_down);
+	//STUB(netif_set_down);
+	uprint("STUB: netif_set_down (ignoring) ");
 	stub_display_netif(netif); nl();
 }
 
@@ -656,7 +657,7 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 		offset += EP_OFFSET;
 		
 		/* If pbuf is to be allocated in RAM, allocate memory for it. */
-		uint16_t alloclen = LWIP_MEM_ALIGN_SIZE(SIZEOF_STRUCT_PBUF + offset) + LWIP_MEM_ALIGN_SIZE(length);
+		size_t alloclen = LWIP_MEM_ALIGN_SIZE(SIZEOF_STRUCT_PBUF + offset) + LWIP_MEM_ALIGN_SIZE(length);
 		struct pbuf* p = (struct pbuf*)mem_malloc(alloclen);
 		if (p == NULL)
 			return NULL;
@@ -675,7 +676,7 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 	if (layer == PBUF_RAW && type == PBUF_REF)
 	{
 		//unused: offset += EP_OFFSET;
-		uint16_t alloclen = LWIP_MEM_ALIGN_SIZE(SIZEOF_STRUCT_PBUF);
+		size_t alloclen = LWIP_MEM_ALIGN_SIZE(SIZEOF_STRUCT_PBUF);
 		struct pbuf* p = (struct pbuf*)mem_malloc(alloclen);
 		if (p == NULL)
 			return NULL;
@@ -783,25 +784,6 @@ void pbuf_ref (struct pbuf *p)
 	if (p)
 		++(p->ref);
 }
-
-
-#if 0
-/** Handle timeouts for NO_SYS==1 (i.e. without using
- * tcpip_thread/sys_timeouts_mbox_fetch(). Uses sys_now() to call timeout
- * handler functions when timeouts expire.
- *
- * Must be called periodically from your main loop.
- */
-void sys_check_timeouts (void)
-{
-	static uint8_t r = 0;
-	if ((++r & 63) == 0)
-	{
-		r = 0;
-		uprint(".");
-	}
-}
-#endif
 
 /**
  * Create a one-shot timer (aka timeout). Timeouts are processed in the
