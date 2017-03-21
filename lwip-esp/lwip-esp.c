@@ -7,17 +7,16 @@
 #include "netif/etharp.h"
 #include "lwip/mem.h"
 
-#include "user_interface.h"
-
 #include "glue.h"
 
 #define STUB(x) do { uerror("STUB: " #x "\n"); } while (0)
 
-void system_pp_recycle_rx_pkt (void*);					// guessed interface, esp blobs
-void system_station_got_ip_set(ip_addr_t* ip, ip_addr_t* mask, ip_addr_t* gw);	// guessed interface, esp blobs
+// guessed interface, esp blobs
+void system_pp_recycle_rx_pkt (void*);
+void system_station_got_ip_set(ip_addr_t* ip, ip_addr_t* mask, ip_addr_t* gw);
 
 const struct eth_addr ethbroadcast = {{0xff,0xff,0xff,0xff,0xff,0xff}};
-struct netif *netif_default;
+struct netif *netif_default; // unused
 
 ///////////////////////////////////////
 // from pbuf.c
@@ -30,6 +29,18 @@ struct netif *netif_default;
 #error EBUF_LWIP should be defined
 #endif
 #define EP_OFFSET 36
+
+///////////////////////////////////////
+// netif
+
+#define NETIF_SELECT(netif) ({\
+	uassert((netif) == netif_sta || (netif) == netif_ap); \
+	(netif) == netif_sta? STATION_IF: SOFTAP_IF; })
+
+#define netif_sta netif_esp[STATION_IF]
+#define netif_ap  netif_esp[SOFTAP_IF]
+static struct netif* netif_esp[2] = { NULL, NULL };
+netif_linkoutput_fn linkoutput = NULL;
 
 ///////////////////////////////////////
 // glue converters
@@ -89,6 +100,10 @@ err_glue_t esp2glue_err (err_glue_t err)
 
 glue_netif_flags_t esp2glue_netif_flags (u8_t flags)
 {
+
+//XXXFIXME this is the paranoia mode
+// make it simpler in non-debug mode
+
 	u8_t copy = flags;
 	u8_t gf = 0;
 	#define CF(x)	do { if (flags & NETIF_FLAG_##x) { gf |= GLUE_NETIF_FLAG_##x; flags &= ~NETIF_FLAG_##x; } } while (0)
@@ -107,99 +122,10 @@ glue_netif_flags_t esp2glue_netif_flags (u8_t flags)
 	return gf;
 }
 
-
-
-//static struct netif* netif_esp[2] = { NULL, NULL };
-static struct netif* netif_esp = NULL;
-netif_linkoutput_fn linkoutput = NULL;
-
-#define PBUF_CUSTOM_TYPE_STATIC 0x42 // must not conflict with PBUF_* (pbuf types)
-#define PBUF_CUSTOM_NUMBER 8
-struct pbuf_wrapper
-{
-	void* ref;	// for glue2git_linkoutput_pbuf_released(void*)
-	struct pbuf pbuf;
-} pbuf_wrappers[PBUF_CUSTOM_NUMBER];
-
-struct pbuf_wrapper* get_free_pbuf_wrapper (void)
-{
-	int i = 0;
-	while (i < PBUF_CUSTOM_NUMBER && pbuf_wrappers[i].ref)
-		i++;
-	if (i < PBUF_CUSTOM_NUMBER)
-		return &pbuf_wrappers[i];
-	uerror("ERROR: not enough pbuf_wrapper\n");
-	return NULL;
-}
-
-void lwip_init_RENAMED (void);
-void lwip_init (void)
-{
-	for (int i = 0; i < PBUF_CUSTOM_NUMBER; i++)
-		pbuf_wrappers[i].ref = NULL;
-	lwip_init_RENAMED();
-}
-
-err_glue_t glue2esp_linkoutput (void* ref2save, char* rawdata, uint16_t size)
-{
-	// get a free pbuf wrapper
-	struct pbuf_wrapper* p = get_free_pbuf_wrapper();
-	if (!p)
-		return GLUE_ERR_ABRT;
-	
-	// reference lwip buffer to send
-	p->ref = ref2save;
-	p->pbuf.payload = rawdata;
-	p->pbuf.len = p->pbuf.tot_len = size;
-	p->pbuf.next = NULL;
-	p->pbuf.type = PBUF_CUSTOM_TYPE_STATIC;
-	p->pbuf.ref = 0;
-	p->pbuf.flags = 0;
-
-	uprint("LINKOUTPUT: real packet sent to wilderness (%dB %p)\n",
-		(int)size, &p->pbuf);
-	
-	return esp2glue_err(linkoutput(netif_esp, &p->pbuf));
-}
-
-void netif_check (struct netif* netif)
-{
-	if (!netif_esp)
-	{
-		netif_esp = netif;
-		linkoutput = netif->linkoutput;
-	}
-
-#if 0
-	if (   netif != netif_esp
-	    || netif->input != ethernet_input
-	    || netif->output != etharp_output
-	    || netif->linkoutput != linkoutput
-	   )
-		uerror("ERROR: bad netif invariants\n");
-#else
-	uassert(   netif == netif_esp
-		&& netif->input == ethernet_input
-		&& netif->output == etharp_output
-		&& netif->linkoutput == linkoutput);
-#endif
-
-	u8_t glueflags = esp2glue_netif_flags(netif->flags);
-
-	esp2glue_netif_updated(
-		netif->ip_addr.addr,
-		netif->netmask.addr,
-		netif->gw.addr,
-		glueflags,
-		netif->hwaddr_len,
-		netif->hwaddr,
-		netif->state);
-}
-
 ///////////////////////////////////////
-// helpers
+// display helpers
 
-#define stub_display_ip(pre,ip) display_ip32(pre,(ip).addr)
+#define stub_display_ip(pre,ip) display_ip32(pre, (ip).addr)
 
 static void stub_display_ip_info (const struct ip_info* i)
 {
@@ -210,7 +136,7 @@ static void stub_display_ip_info (const struct ip_info* i)
 
 static void stub_display_netif_flags (int flags)
 {
-	#define IFF(x)	do { if (flags & NETIF_FLAG_##x) uerror("|" #x); } while (0)
+	#define IFF(x)	do { if (flags & NETIF_FLAG_##x) uprint("|" #x); } while (0)
 	IFF(UP);
 	IFF(BROADCAST);
 	IFF(POINTTOPOINT);
@@ -224,7 +150,7 @@ static void stub_display_netif_flags (int flags)
 
 static void stub_display_netif (struct netif* netif)
 {
-	uerror("@%p name=%c%c idx=%d mtu=%d state=%p " /*"input=%p output=%p"*/ "linkout=%p flags=",
+	uprint("@%p name=%c%c idx=%d mtu=%d state=%p " /*"input=%p output=%p"*/ "linkout=%p flags=",
 		netif,
 		netif->name[0], netif->name[1],
 		netif->num,
@@ -255,7 +181,93 @@ void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type
 }
 
 ///////////////////////////////////////
+// quick pool to store references to data sent
+
+#define PBUF_CUSTOM_TYPE_STATIC 0x42 // must not conflict with PBUF_* (pbuf types)
+#define PBUF_CUSTOM_NUMBER 8
+struct pbuf_wrapper
+{
+	void* ref;	// for glue2git_linkoutput_pbuf_released(void*)
+	struct pbuf pbuf;
+} pbuf_wrappers[PBUF_CUSTOM_NUMBER];
+
+struct pbuf_wrapper* get_free_pbuf_wrapper (void)
+{
+	int i = 0;
+	while (i < PBUF_CUSTOM_NUMBER && pbuf_wrappers[i].ref)
+		i++;
+	if (i < PBUF_CUSTOM_NUMBER)
+		return &pbuf_wrappers[i];
+	uerror("ERROR: not enough pbuf_wrapper\n");
+	return NULL;
+}
+
+// output real packet here:
+err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, char* rawdata, uint16_t size)
+{
+	// get a free pbuf wrapper
+	struct pbuf_wrapper* p = get_free_pbuf_wrapper();
+	if (!p)
+		return GLUE_ERR_ABRT;
+	
+	// reference lwip buffer to send
+	p->ref = ref2save;
+	p->pbuf.payload = rawdata;
+	p->pbuf.len = p->pbuf.tot_len = size;
+	p->pbuf.next = NULL;
+	p->pbuf.type = PBUF_CUSTOM_TYPE_STATIC;
+	p->pbuf.ref = 0;
+	p->pbuf.flags = 0;
+
+	uprint("LINKOUTPUT: real packet sent to wilderness (%dB %p)\n",
+		(int)size, &p->pbuf);
+	
+	// call blobs
+	// blobs will call pbuf_free() back later
+	// we will retreive our ref2save and give it back to glue
+	return esp2glue_err(linkoutput(netif_esp[netif_idx], &p->pbuf));
+}
+
+// this netif is given by ESP blobs
+// so we can know/store/use it
+void netif_check (int netif_idx, struct netif* netif)
+{
+	if (!netif_esp[netif_idx])
+	{
+		netif_esp[netif_idx] = netif;
+		uassert(linkoutput == NULL || linkoutput == netif->linkoutput);
+		linkoutput = netif->linkoutput;
+	}
+
+	uassert(   (   netif == netif_sta
+		    || netif == netif_ap)
+		&& netif->input == ethernet_input
+		&& netif->output == etharp_output
+		&& netif->linkoutput == linkoutput);
+
+	u8_t glueflags = esp2glue_netif_flags(netif->flags);
+
+	esp2glue_netif_updated(
+		netif_idx,
+		netif->ip_addr.addr,
+		netif->netmask.addr,
+		netif->gw.addr,
+		glueflags,
+		netif->hwaddr_len,
+		netif->hwaddr,
+		netif->state);
+}
+
+///////////////////////////////////////
 // STUBS / wrappers
+
+void lwip_init_RENAMED (void); //XXX should use esp2glue_lwip_init()
+void lwip_init (void)
+{
+	for (int i = 0; i < PBUF_CUSTOM_NUMBER; i++)
+		pbuf_wrappers[i].ref = NULL;
+	lwip_init_RENAMED();
+}
 
 /**
  * Resolve and fill-in Ethernet address header for outgoing IP packet.
@@ -275,7 +287,7 @@ void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type
  * - ERR_RTE No route to destination (no gateway to external networks),
  * or the return type of either etharp_query() or etharp_send_ip().
  */
-err_t etharp_output (struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
+err_t etharp_output (struct netif* netif, struct pbuf* q, ip_addr_t* ipaddr)
 {
 	(void)netif; (void)q; (void)ipaddr;
 	//STUB(etharp_output);
@@ -291,16 +303,19 @@ err_t etharp_output (struct netif *netif, struct pbuf *q, ip_addr_t *ipaddr)
  * @param p the recevied packet, p->payload pointing to the ethernet header
  * @param netif the network interface on which the packet was received
  */
-err_t ethernet_input (struct pbuf *p, struct netif *netif)
+err_t ethernet_input (struct pbuf* p, struct netif* netif)
 {
 	//STUB(ethernet_input);
-//	pbuf_info("PACKET RECEIVED!!!", -1, p->len, p->type);
-//	uprint("netif@%p totlen=%d ref=%d eb=%p\n", netif, p->tot_len, p->ref, p->eb);
+	//pbuf_info("PACKET RECEIVED!!!", -1, p->len, p->type);
+	//uprint("netif@%p totlen=%d ref=%d eb=%p\n", netif, p->tot_len, p->ref, p->eb);
+	
+	int netif_idx = NETIF_SELECT(netif);
+	netif_check(netif_idx, netif);
 
-	netif_check(netif);
 	uassert(p->tot_len == p->len && p->ref == 1);
 	
 #if UDEBUG
+	///XXX use global ethbroadcast instead
 	static char bcast [] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 	if (   memcmp((const char*)p->payload, netif->hwaddr, 6) == 0
 	    || memcmp((const char*)p->payload, bcast, 6) == 0)
@@ -308,13 +323,12 @@ err_t ethernet_input (struct pbuf *p, struct netif *netif)
 		dump("FOR ME", p->payload, p->len);
 	}
 #endif
-	
 
 	// copy data to glue pbuf even if it is a ref
 		
 	void* glue_pbuf;
 	void* glue_data;
-	// alloc buffer to copy pbuf
+	// ask glue for space to store payload into
 	esp2glue_alloc_for_recv(p->len, &glue_pbuf, &glue_data);
 	if (!glue_pbuf)
 	{
@@ -324,16 +338,17 @@ err_t ethernet_input (struct pbuf *p, struct netif *netif)
 
 	// copy data
 	os_memcpy(glue_data, p->payload, p->len);
-	// release blob's buffer
+	// release asap blob's buffer
 	// thus avoiding the BMOD "LmacRxBlk:1"
 	pbuf_free(p);
-	p = NULL;
 	// pass to new ip stack
-	return glue2esp_err(esp2glue_ethernet_input(glue_pbuf));
+	return glue2esp_err(esp2glue_ethernet_input(netif_idx, glue_pbuf));
 }
 
 void dhcps_start (struct ip_info *info)
 {
+	// not implemented yet
+
 	//STUB(dhcps_start);
 	uprint("STUB: dhcps_start ");
 	stub_display_ip_info(info);
@@ -342,22 +357,30 @@ void dhcps_start (struct ip_info *info)
 
 void dhcps_stop (void)
 {
+	// not implemented yet
+	
 	STUB(dhcps_stop);
 }
 
 void espconn_init (void)
 {
+	// not implemented yet
+	
 	STUB(espconn_init);
 }
 
 void dhcp_cleanup (struct netif *netif)
 {
+	// not implemented yet
+
 	STUB(dhcp_cleanup);
 	stub_display_netif(netif); nl();
 }
 
 err_t dhcp_release (struct netif *netif)
 {
+	// not implemented yet
+	
 	STUB(dhcp_release);
 	stub_display_netif(netif); nl();
 	return ERR_ABRT;
@@ -377,6 +400,7 @@ err_t dhcp_release (struct netif *netif)
  */
 err_t dhcp_start (struct netif* netif)
 {
+	// at that point, assume that serial port is open for printing debug output
 	doprint_allow = 1;
 	
 	//STUB(dhcp_start);
@@ -385,26 +409,21 @@ err_t dhcp_start (struct netif* netif)
 	stub_display_netif(netif);
 	uprint(")\n");
 
-	netif_check(netif);
+	// dhcp is for supposed to be for station only
+	// at this point netif_sta is not yet initialized
+	netif_check(STATION_IF, netif);
+	// now it is
 
 	return glue2esp_err(esp2glue_dhcp_start());
 }
 
 void dhcp_stop (struct netif *netif)
 {
+	// not implemented yet
+
 	STUB(dhcp_stop);
 	stub_display_netif(netif); nl();
 }
-
-#if 0
-/**
- * Perform Sanity check of user-configurable values, and initialize all modules.
- */
-void lwip_init (void)
-{
-	STUB(lwip_init);
-}
-#endif
 
 /**
  * Add a network interface to the list of lwIP netifs.
@@ -478,6 +497,7 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 		netif->loop_cnt_current = 0;
 		#endif /* ENABLE_LOOPBACK && LWIP_LOOPBACK_MAX_PBUFS */
 	netif_set_addr(netif, ipaddr, netmask, gw);
+	//XXX fixme init() is from blobs to call blobs, unknown yet
 	if (init(netif) != ERR_OK)
 	{
 		uprint("ERROR netif_add: caller's init() failed\n");
@@ -493,9 +513,10 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	#endif /* LWIP_IGMP */
 	//////////////////////////////
 
-	netif_check(netif);
+//	int netif_idx = NETIF_SELECT(netif);
+//	netif_check(netif_idx, netif);
 	
-	uprint("WRAP: netif_add(ed): ");
+	uprint("WRAP: netif_added for ESP only ");
 	stub_display_netif(netif);
 	uprint("\n");
 	
@@ -523,18 +544,26 @@ void netif_remove (struct netif *netif)
  * @param netmask the new netmask
  * @param gw the new default gateway
  */
-void netif_set_addr (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw)
+void netif_set_addr (struct netif* netif, ip_addr_t* ipaddr, ip_addr_t* netmask, ip_addr_t* gw)
 {
 	//STUB(netif_set_addr);
+	
 	if (ipaddr) netif->ip_addr = *ipaddr;
 	if (netmask) netif->netmask = *netmask;
 	if (gw) netif->gw = *gw;
+#if UDEBUG
 	uprint("WRAP: netif_set_addr ");
 	if (ipaddr) stub_display_ip("ip=", *ipaddr);
 	if (netmask) stub_display_ip(" mask=", *netmask);
 	if (gw) stub_display_ip(" gw=", *gw);
-	netif_check(netif);
+#endif
+
+	int netif_idx = NETIF_SELECT(netif);
+	netif_check(netif_idx, netif);
+
+#if UDEBUG
 	stub_display_netif(netif); nl();
+#endif
 }
 
 /**
@@ -548,8 +577,7 @@ void netif_set_default (struct netif *netif)
 	//STUB(netif_set_default);
 	//stub_display_netif(netif); nl();
 	uprint("WRAP: netif_set_default: %p\n", netif);
-	// ... yes this is default
-	netif_check(netif);
+	//netif_check(netif);
 }
 
 /**
@@ -579,7 +607,7 @@ void netif_set_up (struct netif *netif)
 {
 	STUB(netif_set_up);
 	stub_display_netif(netif); nl();
-	netif_check(netif);
+//	netif_check(netif);
 }
 
 /**
@@ -614,7 +642,7 @@ void netif_set_up (struct netif *netif)
  * is the first pbuf of a pbuf chain.
  */
 
-struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
+struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 {
 	// pbuf creation from blobs
 	// copy parts of original code matching specific requests
@@ -646,9 +674,6 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 	
 	if (layer == PBUF_RAW && type == PBUF_REF)
 	{
-		// received packets from wlan?e :) ?
-		// real lwip get pbuf from pool XXX FIXME
-		
 		//unused: offset += EP_OFFSET;
 		uint16_t alloclen = LWIP_MEM_ALIGN_SIZE(SIZEOF_STRUCT_PBUF);
 		struct pbuf* p = (struct pbuf*)mem_malloc(alloclen);
@@ -665,7 +690,7 @@ struct pbuf* pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
 		return p;
 	}
 
-//	uprint("STUB: pbuf_alloc BAD CASE\n");
+	uerror("WRAP: pbuf_alloc BAD CASE\n");
 		
 	return NULL;
 }
@@ -810,20 +835,22 @@ void sys_untimeout(sys_timeout_handler handler, void *arg)
 	STUB(sys_untimeout);
 }
 
-void glue2esp_ifup (uint32_t ip, uint32_t mask, uint32_t gw)
+void glue2esp_ifup (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw)
 {
+	struct netif* netif = netif_esp[netif_idx];
+
 	// backup old esp ips
 	ip_addr_t oldip, oldmask, oldgw;
-	oldip = netif_esp->ip_addr;
-	oldmask = netif_esp->netmask;
-	oldgw = netif_esp->gw;
+	oldip = netif->ip_addr;
+	oldmask = netif->netmask;
+	oldgw = netif->gw;
 	        
 	// change ips
-	netif_esp->ip_addr.addr = ip;
-	netif_esp->netmask.addr = mask;
-	netif_esp->gw.addr = gw;
+	netif->ip_addr.addr = ip;
+	netif->netmask.addr = mask;
+	netif->gw.addr = gw;
 	// set up
-	netif_esp->flags |= NETIF_FLAG_UP;
+	netif->flags |= NETIF_FLAG_UP;
 
 	// tell esp to check it has changed (by giving old ones)
 	system_station_got_ip_set(&oldip, &oldmask, &oldgw);

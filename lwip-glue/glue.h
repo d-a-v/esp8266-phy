@@ -4,6 +4,7 @@
 
 #include "ets_sys.h"
 #include "osapi.h"
+#include "user_interface.h"
 
 #include "uprint.h"
 #include "doprint.h"
@@ -56,13 +57,13 @@ typedef enum
 } glue_netif_flags_t;
 
 err_glue_t	esp2glue_dhcp_start	(void);
-void		esp2glue_netif_updated	(uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state);
-err_glue_t	esp2glue_ethernet_input	(void* glue_pbuf); //XXX RENAMEME
+void		esp2glue_netif_updated	(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, uint16_t flags, uint8_t hwlen, const uint8_t* hw, void* state);
+err_glue_t	esp2glue_ethernet_input	(int netif_idx, void* glue_pbuf);
 void		esp2glue_alloc_for_recv	(uint16_t len, void** glue_pbuf, void** glue_data);
 
-err_glue_t	glue2esp_linkoutput	(void* ref2save, char* rawdata, uint16_t size);
+err_glue_t	glue2esp_linkoutput	(int netif_idx, void* ref2save, char* rawdata, uint16_t size);
 void		esp2glue_ref_freed	(void* ref_saved);
 
-void		glue2esp_ifup		(uint32_t ip, uint32_t mask, uint32_t gw);
+void		glue2esp_ifup		(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw);
 
 #endif // GLUE_STUB_H
