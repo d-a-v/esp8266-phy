@@ -588,17 +588,9 @@ void netif_set_addr (struct netif* netif, ip_addr_t* ipaddr, ip_addr_t* netmask,
 	set.ip.addr = ipaddr->addr;
 	set.netmask.addr = netmask->addr;
 	set.gw.addr = gw->addr;
-uprint("ESP netif_set_addr:");
-display_ip_info(&set);
-nl();
 	wifi_set_ip_info(netif_idx, &set);
-struct ip_info test;
-wifi_get_ip_info(SOFTAP_IF, &test);
-uprint("ESP netif_set_addr test:");
-display_ip_info(&test);
-nl();
-
 	
+	esp2glue_netif_updated(netif_idx, ipaddr->addr, netmask->addr, gw->addr, netif->flags, netif->hwaddr_len, netif->hwaddr);
 }
 
 /**

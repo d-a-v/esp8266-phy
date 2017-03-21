@@ -360,14 +360,19 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 //XXX blorgl here. netif can be updated from both side. two-way update to setup
 
 	struct netif* netif = &netif_git[netif_idx];
-	if (setup_netif(netif_idx))
+	setup_netif(netif_idx);
+	
+	if (!netif->ip_addr.addr)
 	{
 		netif->ip_addr.addr = ip;
 		netif->netmask.addr = mask;
 		netif->gw.addr = gw;
 		//netif->state = state; // do not overwrite, dhcps uses it as a udp_pcb
 	}
-	netif->flags = glue2git_netif_flags(flags);
+
+	netif->flags |= glue2git_netif_flags(flags);
+	// this was not done in old lwip and is needed for dhcp client
+	netif->flags |= NETIF_FLAG_UP;
 
 	if (netif->hwaddr_len != 6)
 	{
@@ -381,9 +386,6 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 		else
 			hostname_sta[0] = 0;
 	}
-	
-	// this was not done in old lwip and is needed for dhcp
-	netif->flags |= NETIF_FLAG_UP;
 	
 	uprint("GLUE: netif(%s) updated up by ESP: flags=", netif_name[netif_idx]);
 	new_display_netif_flags(netif->flags);
@@ -400,6 +402,11 @@ void esp2glue_alloc_for_recv (size_t len, void** pbuf, void** data)
 err_glue_t esp2glue_ethernet_input (int netif_idx, void* received)
 {
 	// this input is allocated by esp2glue_alloc_for_recv()
+
+	//uprint("GLUE: input idx=%d netif-flags=0x%x ", netif_idx, netif_git[netif_idx].flags);
+	//display_ip32(" ip=", netif_git[netif_idx].ip_addr.addr);
+	//nl();
+	
 	return new2glue_err(ethernet_input((struct pbuf*)received, &netif_git[netif_idx]));
 }
 

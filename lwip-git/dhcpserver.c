@@ -728,7 +728,7 @@ void ICACHE_FLASH_ATTR dhcps_start(struct ip_info *info)
     
     struct netif * apnetif = netif_ap;
     
-uprint("dhcps_start: apnetif=%p state/dhcps_pcb=%p\n", apnetif, apnetif->state);
+    //uprint("dhcps_start: apnetif=%p state/dhcps_pcb=%p\n", apnetif, apnetif->state);
     
     //if(apnetif->dhcps_pcb != NULL) {
     //    udp_remove(apnetif->dhcps_pcb);
@@ -756,20 +756,8 @@ uprint("dhcps_start: apnetif=%p state/dhcps_pcb=%p\n", apnetif, apnetif->state);
     os_printf("dhcps:dhcps_start->udp_recv function Set a receive callback handle_dhcp for UDP_PCB pcb_dhcps\n");
 #endif
 
-struct ip_info test0;
-uprint("test01:");display_ip_info(&test0);nl();
-wifi_get_ip_info(SOFTAP_IF, &test0);
-uprint("test02:");display_ip_info(&test0);nl();
-
-uprint("set1:");display_ip_info(info);nl();
-wifi_set_ip_info(SOFTAP_IF, info);
-uprint("set2:");display_ip_info(info);nl();
-
-struct ip_info test;
-uprint("test11:");display_ip_info(&test);nl();
-wifi_get_ip_info(SOFTAP_IF, &test);
-uprint("test12:");display_ip_info(&test);nl();
-
+    wifi_set_ip_info(SOFTAP_IF, info); // added for lwip-git, not sure whether useful
+    netif_set_default(netif_ap);
 }
 
 void ICACHE_FLASH_ATTR dhcps_stop(void)
