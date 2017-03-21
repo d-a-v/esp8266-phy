@@ -3,6 +3,7 @@
 
 #include "ets_sys.h"
 #include "osapi.h"
+#include "esp-missing.h"
 
 typedef int sys_prot_t;	// not really used
 #define SYS_ARCH_DECL_PROTECT(lev)
@@ -29,7 +30,6 @@ int doprint (const char* format, ...) __attribute__ ((format (printf, 1, 2)));
 
 #define sys_now millis		// arduino wire millis() definition returns 32 bits like sys_now() does
 #define LWIP_RAND r_rand	// old lwip uses this useful undocumented function
-uint32_t r_rand (void);		// esp blobs
 
 // ip_addr / ip_info: do not exist in lwip2 (only in lwip1.4), but used in blobs:
 // esp8266/tools/sdk/include/user_interface.h:bool wifi_get/set_ip_info(uint8 if_index, struct ip_info *info);

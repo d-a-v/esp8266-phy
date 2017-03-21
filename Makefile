@@ -17,7 +17,7 @@ install release: all
 	rm -f $(ESP_LWIP); ln -sf $(abspath lwip-git-src) $(ESP_LWIP)
 	rm -f lwip-git-src/src/include/arch; ln -sf $(abspath lwip-git/arch) lwip-git-src/src/include
 	rm -f lwip-git-src/include; ln -sf src/include lwip-git-src/include
-	ln -sf $(abspath lwip-git/lwipopts.h) lwip-git-src/src/include
+	ln -sf $(abspath lwip-git/lwipopts.h) $(abspath lwip-glue/esp-missing.h) lwip-git-src/src/include
 
 try: all install
 

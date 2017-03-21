@@ -26,7 +26,7 @@ int doprint (const char* format, ...)
 
 // bufferize
 
-#define ROTBUFLEN_BIT	9 // 11=2048
+#define ROTBUFLEN_BIT	11 // 11=2048
 #define ROTBUFLEN	(1 << (ROTBUFLEN_BIT))
 #define ROTBUFLEN_MASK	((ROTBUFLEN) - 1)
 

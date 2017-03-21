@@ -1,20 +1,23 @@
 
 #include "lwipopts.h"
 #include "lwip/err.h"
+#include "lwip/init.h"
 #include "lwip/netif.h"
 #include "lwip/dhcp.h"
 #include "lwip/etharp.h"
 #include "netif/ethernet.h"
+#include "lwip/app/dhcpserver.h"
 
 #include "glue.h"
+#include "lwip-helper.h"
 
 static char hostname_sta[32];
 
 #define netif_sta (&netif_git[STATION_IF])
 #define netif_ap  (&netif_git[SOFTAP_IF])
-static struct netif netif_git[2];
-static int netif_git_initialized[2] = { 0, 0 }; //XXX or char?
-static const char netif_name[2][8] = { "station", "soft-ap" };
+struct netif netif_git[2];
+int netif_git_initialized[2] = { 0, 0 }; //XXX or char?
+const char netif_name[2][8] = { "station", "soft-ap" };
 
 int ntp_servers_number = 0;
 ip4_addr_t* ntp_servers = NULL;
@@ -105,6 +108,16 @@ static void new_display_netif_flags (int flags)
 	IFF(IGMP);
 	IFF(MLD6);
 	#undef IFF
+}
+
+int lwiperr_check (const char* what, err_t err)
+{
+	if (err != ERR_OK)
+	{
+		uerror("ERROR: %s (error %d)\n", what, err);
+		return 0;
+	}
+	return 1;
 }
 
 err_glue_t esp2glue_dhcp_start ()
@@ -333,7 +346,15 @@ static char setup_netif (int netif_idx)
 	return 1;
 };
 
-void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, uint32_t flags, uint32_t hwlen, const uint8_t* hw, void* state)
+void esp2glue_lwip_init (void)
+{
+	memset(&netif_git[0], 0, sizeof(netif_git[0]));
+	memset(&netif_git[1], 0, sizeof(netif_git[1]));
+
+	lwip_init();
+}
+
+void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, uint32_t flags, uint32_t hwlen, const uint8_t* hw /*, void* state*/)
 {
 
 //XXX blorgl here. netif can be updated from both side. two-way update to setup
@@ -344,7 +365,7 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 		netif->ip_addr.addr = ip;
 		netif->netmask.addr = mask;
 		netif->gw.addr = gw;
-		netif->state = state; // useless: new-lwip does not use it
+		//netif->state = state; // do not overwrite, dhcps uses it as a udp_pcb
 	}
 	netif->flags = glue2git_netif_flags(flags);
 
@@ -380,4 +401,9 @@ err_glue_t esp2glue_ethernet_input (int netif_idx, void* received)
 {
 	// this input is allocated by esp2glue_alloc_for_recv()
 	return new2glue_err(ethernet_input((struct pbuf*)received, &netif_git[netif_idx]));
+}
+
+void esp2glue_dhcps_start (struct ip_info* info)
+{
+	dhcps_start(info);
 }
