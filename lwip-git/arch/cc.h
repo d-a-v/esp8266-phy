@@ -1,9 +1,17 @@
 #ifndef LWIP2_ARCH_CC_H
 #define LWIP2_ARCH_CC_H
 
+#include "stdint.h"
+
+#ifdef LWIP_BUILD
+// define LWIP_BUILD only when building LWIP
+// otherwise include files below would conflict
+// with standard headers like atoi()
 #include "ets_sys.h"
 #include "osapi.h"
 #include "esp-missing.h"
+#endif
+#include "mem.h" // useful for os_malloc used in esp-arduino's mDNS
 
 typedef int sys_prot_t;	// not really used
 #define SYS_ARCH_DECL_PROTECT(lev)
@@ -31,8 +39,7 @@ int doprint (const char* format, ...) __attribute__ ((format (printf, 1, 2)));
 #define sys_now millis		// arduino wire millis() definition returns 32 bits like sys_now() does
 #define LWIP_RAND r_rand	// old lwip uses this useful undocumented function
 
-// ip_addr / ip_info: do not exist in lwip2 (only in lwip1.4), but used in blobs:
-// esp8266/tools/sdk/include/user_interface.h:bool wifi_get/set_ip_info(uint8 if_index, struct ip_info *info);
+// ip_addr / ip_info: do not exist in lwip2 (only in lwip1.4)
 struct ip_addr {
   uint32_t addr;
 };

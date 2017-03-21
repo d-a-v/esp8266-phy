@@ -29,7 +29,7 @@ LWIP_SRCS = \
 
 LWIP_INCLUDE = -Ibuild -I$(SDK_PATH)/include -Iinclude -I../../lwip-git -I../../lwip-glue
 BUILD_FLAGS = -Wall -Wextra -c -Os -g -Wpointer-arith -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
-BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC
+BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC -DLWIP_BUILD
 
 CC=$(TOOLS_PATH)gcc
 AR=$(TOOLS_PATH)ar
