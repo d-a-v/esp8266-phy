@@ -35,7 +35,7 @@ struct netif *netif_default; // unused
 
 #define NETIF_SELECT(netif) ({\
 	uassert((netif) == netif_sta || (netif) == netif_ap); \
-	(netif) == netif_sta? STATION_IF: SOFTAP_IF; })
+	(netif) == netif_ap? SOFTAP_IF: STATION_IF; })
 
 #define netif_sta netif_esp[STATION_IF]
 #define netif_ap  netif_esp[SOFTAP_IF]
@@ -516,7 +516,7 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 //	int netif_idx = NETIF_SELECT(netif);
 //	netif_check(netif_idx, netif);
 	
-	uprint("WRAP: netif_added for ESP only ");
+	uprint("WRAP: ESP-netif_add(ed) ESP-name=%c%c", netif->name[0], netif->name[1]);
 	stub_display_netif(netif);
 	uprint("\n");
 	
@@ -556,8 +556,8 @@ void netif_set_addr (struct netif* netif, ip_addr_t* ipaddr, ip_addr_t* netmask,
 	if (ipaddr) stub_display_ip("ip=", *ipaddr);
 	if (netmask) stub_display_ip(" mask=", *netmask);
 	if (gw) stub_display_ip(" gw=", *gw);
+	nl();
 #endif
-
 	int netif_idx = NETIF_SELECT(netif);
 	netif_check(netif_idx, netif);
 

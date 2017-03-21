@@ -10,11 +10,11 @@
 
 static char hostname_sta[32];
 
-#define netif_sta (netif_git[STATION_IF])
-#define netif_ap  (netif_git[SOFTAP_IF])
-static struct netif* netif_git[2] = { NULL, NULL };
+#define netif_sta (&netif_git[STATION_IF])
+#define netif_ap  (&netif_git[SOFTAP_IF])
+static struct netif netif_git[2];
 static int netif_git_initialized[2] = { 0, 0 }; //XXX or char?
-static const char netif_name[2][8] = { "soft-ap", "station" };
+static const char netif_name[2][8] = { "station", "soft-ap" };
 
 err_t glue2git_err (err_glue_t err)
 {
@@ -166,7 +166,7 @@ static char setup_netif (int netif_idx)
 	if (netif_git_initialized[netif_idx])
 		return 0;
 	netif_git_initialized[netif_idx] = 1;
-	struct netif* netif = netif_git[netif_idx];
+	struct netif* netif = &netif_git[netif_idx];
 
 	#if !LWIP_SINGLE_NETIF
 	netif->next = NULL;
@@ -311,7 +311,8 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 
 //XXX blorgl here. netif can be updated from both side. two-way update to setup
 
-	struct netif* netif = netif_git[netif_idx];
+uprint("2idx=%d\n", netif_idx);
+	struct netif* netif = &netif_git[netif_idx];
 	if (setup_netif(netif_idx))
 	{
 		netif->ip_addr.addr = ip;
@@ -335,7 +336,7 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 	}
 	
 	// this was not done in old lwip and is needed for dhcp
-//	netif->flags |= NETIF_FLAG_UP;
+	netif->flags |= NETIF_FLAG_UP;
 	
 	uprint("GLUE: netif(%s) updated up by ESP: flags=", netif_name[netif_idx]);
 	new_display_netif_flags(netif->flags);
@@ -352,5 +353,5 @@ void esp2glue_alloc_for_recv (uint16_t len, void** pbuf, void** data)
 err_glue_t esp2glue_ethernet_input (int netif_idx, void* received)
 {
 	// this input is allocated by esp2glue_alloc_for_recv()
-	return new2glue_err(ethernet_input((struct pbuf*)received, netif_git[netif_idx]));
+	return new2glue_err(ethernet_input((struct pbuf*)received, &netif_git[netif_idx]));
 }
