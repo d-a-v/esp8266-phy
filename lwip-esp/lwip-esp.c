@@ -356,6 +356,9 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 
 void dhcps_start (struct ip_info* info)
 {
+	// at that point, assume that serial port is open for printing debug output
+	doprint_allow = 1;
+
 	uprint("WRAP dhcps_start ");
 	display_ip_info(info);
 	uprint("\n");
@@ -363,6 +366,11 @@ void dhcps_start (struct ip_info* info)
 	blobs_getinfo();
 
  	esp2glue_dhcps_start(info);
+ 	
+	if (netif_ap)
+		///XXX this is mandatory for blobs to be happy
+		// but we should get this info back through glue
+	 	netif_ap->flags |= NETIF_FLAG_UP | NETIF_FLAG_LINK_UP;
 }
 
 void dhcps_stop (void)
