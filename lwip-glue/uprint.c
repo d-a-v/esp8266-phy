@@ -2,6 +2,8 @@
 #include "uprint.h"
 #include "glue.h"
 
+#if UDEBUG
+
 void dump (const char* what, const char* data, uint16_t len)
 {
 	#define N 16
@@ -42,3 +44,4 @@ void display_ip_info (const struct ip_info* i)
 	display_ip32(" gw=", i->gw.addr);
 }
 
+#endif

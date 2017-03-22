@@ -122,6 +122,8 @@ glue_netif_flags_t esp2glue_netif_flags (u8_t flags)
 ///////////////////////////////////////
 // display helpers
 
+#if UDEBUG
+
 #define stub_display_ip(pre,ip) display_ip32(pre, (ip).addr)
 
 static void stub_display_netif_flags (int flags)
@@ -173,6 +175,14 @@ void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type
 		type==PBUF_ESF_RX? "esp-wlan":
 		"???", (int)type);
 }
+
+#else // !UDEBUG
+
+#define stub_display_netif_flags(x) do { (void)0; } while (0)
+#define stub_display_netif(x) do { (void)0; } while (0)
+#define pbuf_info(x,y,z,w) do { (void)0; } while (0)
+
+#endif // !UDEBUG
 
 ///////////////////////////////////////
 // quick pool to store references to data sent
@@ -391,20 +401,22 @@ void espconn_init (void)
 	blobs_getinfo();
 }
 
-void dhcp_cleanup (struct netif *netif)
+void dhcp_cleanup (struct netif* netif)
 {
 	// not implemented yet
-
+	(void)netif;
+	
 	STUB(dhcp_cleanup);
-	stub_display_netif(netif); nl();
+	stub_display_netif(netif);
 }
 
-err_t dhcp_release (struct netif *netif)
+err_t dhcp_release (struct netif* netif)
 {
 	// not implemented yet
+	(void)netif;
 	
 	STUB(dhcp_release);
-	stub_display_netif(netif); nl();
+	stub_display_netif(netif);
 	return ERR_ABRT;
 }
 
@@ -434,12 +446,13 @@ err_t dhcp_start (struct netif* netif)
 	return glue2esp_err(esp2glue_dhcp_start());
 }
 
-void dhcp_stop (struct netif *netif)
+void dhcp_stop (struct netif* netif)
 {
+	(void)netif;
+	
 	// not implemented yet
-
 	STUB(dhcp_stop);
-	stub_display_netif(netif); nl();
+	stub_display_netif(netif);
 }
 
 /**
@@ -546,8 +559,10 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
  */
 void netif_remove (struct netif *netif)
 {
+	(void)netif;
+	
 	uprint("STUB netif_remove ");
-	stub_display_netif(netif); nl();
+	stub_display_netif(netif);
 }
 
 /**

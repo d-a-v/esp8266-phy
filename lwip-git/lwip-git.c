@@ -99,7 +99,7 @@ u8_t glue2git_netif_flags (glue_netif_flags_t flags)
 
 static void new_display_netif_flags (int flags)
 {
-	#define IFF(x)	do { if (flags & NETIF_FLAG_##x) uerror("|" #x); } while (0)
+	#define IFF(x)	do { if (flags & NETIF_FLAG_##x) uprint("|" #x); } while (0)
 	IFF(UP);
 	IFF(BROADCAST);
 	IFF(LINK_UP);
