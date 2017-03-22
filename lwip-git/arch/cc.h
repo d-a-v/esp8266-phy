@@ -20,7 +20,7 @@ typedef int sys_prot_t;	// not really used
 
 ///////////////////////////////
 //// DEBUG
-#if 1 // debug 1:on or 0
+#if 0 // debug 1:on or 0
 
 //#define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH|LWIP_DBG_HALT)
 #define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH)

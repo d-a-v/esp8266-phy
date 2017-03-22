@@ -705,7 +705,7 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 		p->eb = NULL;
 		p->ref = 1;
 		p->flags = 0;
-//		uprint("WRAP: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
+		uprint("WRAP: pbuf_alloc-> %p %dB type=%d\n", p, alloclen, type);
 		return p;
 	}
 	
@@ -723,7 +723,7 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 		p->eb = NULL;
 		p->ref = 1;
 		p->flags = 0;
-//		uprint("WRAP: pbuf_alloc-> %p (%d bytes)\n", p, alloclen);
+		uprint("WRAP: pbuf_alloc-> %p %dB type=%d\n", p, alloclen, type);
 		return p;
 	}
 
@@ -769,7 +769,7 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 u8_t pbuf_free (struct pbuf *p)
 {
 	//STUB(pbuf_free);
-	//uprint("WRAP: pbuf_free(%p) ref=%d type=%d\n", p, p->ref, p->type);
+	uprint("WRAP: pbuf_free(%p) ref=%d type=%d\n", p, p->ref, p->type);
 //	pbuf_info("pbuf_free", -1, p->len, p->type);
 //	uprint("pbuf@%p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
 	
@@ -777,18 +777,17 @@ u8_t pbuf_free (struct pbuf *p)
 	#error LWIP_SUPPORT_CUSTOM_PBUF is defined
 	#endif
 
+	uassert(p->ref == 1);
+
 	if (p->type == PBUF_CUSTOM_TYPE_STATIC)
 	{
 		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)( (char*)p - ((char*)&pbuf_wrappers[0].pbuf - (char*)&pbuf_wrappers[0]) );
 
-		// pw->ref is the lwip2 pbuf to release, the current lwip1 pbuf points inside it
+		// pw->ref2save is the lwip2 pbuf to release, the current lwip1 pbuf points inside it
 		uprint("WRAP: pbuf_free release lwip2 pbuf %p lwip1 %p\n", pw->ref2save, &pw->pbuf);
 		if (pw->ref2save)
 			esp2glue_ref_freed(pw->ref2save);
 			
-		if (pw->pbuf.ref != 1)
-			uprint("ERROR bad pbuf_wrapper ref=%d\n", pw->pbuf.ref);
-		
 		pw->used = 0; // release our pooled static pbuf_wrapper
 
 		return 1;

@@ -192,23 +192,36 @@ void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
 #endif
 }
 
+#if 1
+void check_chain (const char* pre, struct pbuf* head)
+{
+uprint("%s:A", pre);
+	struct pbuf* qq = head;
+	size_t rr = qq->tot_len;
+uprint("B");
+	while (rr > 0)
+	{
+		rr -= qq->len;
+uprint("C(qq=%p next=%p)", qq, qq->next);
+		qq = qq->next;
+uprint("D");
+
+// chain is damaged. check esp-pbuf->eb and EP_OFFSET / PBUF_LINK_ENCAPSULATION_HLEN honoured in esp-pbuf_alloc
+// check if in lwip-git/pbuf_alloc PBUF_LINK_ENCAPSULATION_HLEN is honoured as in original esp-pbuf_alloc
+
+	}
+	if (qq)
+		uprint("ERROR IN CHAIN AFTER %p\n", qq);
+	else
+		uprint("CHAIN OK\n");
+}
+#endif
+
 err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 {
 	int netif_idx = netif == netif_sta? STATION_IF: SOFTAP_IF;
 	err_t err = ERR_OK;
 	struct pbuf* head = p;
-	
-#if 1
-	struct pbuf* q = p;
-	size_t r = q->tot_len;
-	while (r > 0)
-	{
-		r -= q->len;
-		q = q->next;
-	}
-	if (q)
-		uprint("ERROR IN CHAIN BEFORE %p\n", q);
-#endif
 	
 	
 	while (1)
@@ -221,11 +234,13 @@ err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 
 		size_t remain = p->tot_len - p->len;
 
+check_chain("1", head);
 		err = glue2git_err(glue2esp_linkoutput(
 			netif_idx,
 			p->len == p->tot_len? head: NULL, // last chunk, pass head to release
 			p->payload,
 			p->len));
+check_chain("2", head);
 		
 		uprint("GLUE: linkoutput ret=%d\n", err);
 		if (err != ERR_OK)
@@ -243,27 +258,8 @@ err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 		p = p->next;
 	}
 
-#if 1
-uprint("A\n");
-	struct pbuf* qq = head;
-	size_t rr = qq->tot_len;
-uprint("B\n");
-	while (rr > 0)
-	{
-		rr -= qq->len;
-uprint("C qq=%p next=%p\n", qq, qq->next);
-		qq = qq->next;
-uprint("D\n");
+check_chain("3", head);
 
-// chain is damaged. check esp-pbuf->eb and EP_OFFSET / PBUF_LINK_ENCAPSULATION_HLEN honoured in esp-pbuf_alloc
-// check if in lwip-git/pbuf_alloc PBUF_LINK_ENCAPSULATION_HLEN is honoured as in original esp-pbuf_alloc
-
-	}
-	if (qq)
-		uprint("ERROR IN CHAIN AFTER %p\n", qq);
-	else
-		uprint("CHAIN OK\n");
-#endif
 	return err;
 }
 
