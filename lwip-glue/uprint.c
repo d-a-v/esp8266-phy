@@ -29,9 +29,16 @@ void display_ip32 (const char* pre, uint32_t ip)
 		(int)(ip >> 24));
 }
 
+void display_mac (const uint8_t* mac)
+{
+	uprint("%02x:%02x:%02x:%02x:%02x:%02x",
+		mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
 void display_ip_info (const struct ip_info* i)
 {
 	display_ip32("ip=", i->ip.addr);
 	display_ip32(" mask=", i->netmask.addr);
 	display_ip32(" gw=", i->gw.addr);
 }
+

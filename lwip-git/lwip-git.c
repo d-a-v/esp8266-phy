@@ -119,12 +119,14 @@ static const char* new_netif_name (struct netif* netif)
 static void new_display_netif (struct netif* netif)
 {
 	
-	uprint("lwip-@%p %s name=%c%c%d mtu=%d state=%p flags=",
+	uprint("lwip-@%p %s name=%c%c%d mtu=%d state=%p ",
 		netif,
 		new_netif_name(netif),
 		netif->name[0], netif->name[1], netif->num,
 		netif->mtu,
 		netif->state);
+	if (netif->hwaddr_len == 6)
+		display_mac(netif->hwaddr);
 	new_display_netif_flags(netif->flags);
 	display_ip32(" ip=", netif->ip_addr.addr);
 	display_ip32(" mask=", netif->netmask.addr);
@@ -186,7 +188,9 @@ err_t new_linkoutput (struct netif *netif, struct pbuf *p)
 	uprint("GLUE: linkoutput netif-%s pbuf@%p len=%d totlen=%d type=%d\n", new_netif_name(netif), p, p->len, p->tot_len, p->type);
 	//dump("SENDING", p->payload, p->len);
 	pbuf_ref(p); // freed by esp2glue_ref_freed() below
-	return glue2git_err(glue2esp_linkoutput(netif == netif_sta? STATION_IF: SOFTAP_IF, p, p->payload, p->len));
+	err_t err = glue2git_err(glue2esp_linkoutput(netif == netif_sta? STATION_IF: SOFTAP_IF, p, p->payload, p->len));
+	uprint("GLUE: linkoutput ret=%d\n", err);
+	return err;
 }
 
 void esp2glue_ref_freed (void* pbuf)
@@ -209,12 +213,10 @@ static void netif_status_callback (struct netif* netif)
 	
 	if (netif->flags & NETIF_FLAG_LINK_UP)
 	{
-		uassert(netif == netif_sta || netif == netif_ap);
-		
 		// tell ESP that link is up
 		glue2esp_ifup(netif == netif_sta? STATION_IF: SOFTAP_IF, netif->ip_addr.addr, netif->netmask.addr, netif->gw.addr);
 
-		//if (netif == netif_sta)
+		if (netif == netif_sta)
 			// this is our default route
 			netif_set_default(netif);
 	}

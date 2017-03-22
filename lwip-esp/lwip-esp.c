@@ -38,7 +38,6 @@ struct netif *netif_default;
 #define netif_sta netif_esp[STATION_IF]
 #define netif_ap  netif_esp[SOFTAP_IF]
 static struct netif* netif_esp[2] = { NULL, NULL };
-netif_linkoutput_fn linkoutput = NULL;
 
 ///////////////////////////////////////
 // glue converters
@@ -142,12 +141,14 @@ static void stub_display_netif_flags (int flags)
 static void stub_display_netif (struct netif* netif)
 {
 	uassert(netif == netif_sta || netif == netif_ap);
-	uprint("esp-@%p %s name=%c%c%d mtu=%d state=%p flags=",
+	uprint("esp-@%p %s name=%c%c%d mtu=%d state=%p ",
 		netif,
 		netif == netif_ap? "AP": "STA",
 		netif->name[0], netif->name[1], netif->num,
 		netif->mtu,
 		netif->state);
+	if (netif->hwaddr_len == 6)
+		display_mac(netif->hwaddr);
 	stub_display_netif_flags(netif->flags);
 	display_ip32(" ip=", netif->ip_addr.addr);
 	display_ip32(" mask=", netif->netmask.addr);
@@ -212,23 +213,38 @@ err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, char* rawdata, si
 	p->pbuf.ref = 0;
 	p->pbuf.flags = 0;
 
-	uprint("LINKOUTPUT: real packet sent to wilderness (%dB %p)\n",
-		(int)size, &p->pbuf);
+	struct netif* netif = netif_esp[netif_idx];
+
+	uprint("LINKOUTPUT: real packet sent to wilderness (%dB pb=%p netif=esp-%p)\n",
+		(int)size,
+		&p->pbuf,
+		netif);
 	
 	// call blobs
 	// blobs will call pbuf_free() back later
 	// we will retreive our ref2save and give it back to glue
-	return esp2glue_err(linkoutput(netif_esp[netif_idx], &p->pbuf));
+	return esp2glue_err(netif->linkoutput(netif, &p->pbuf));
+}
+
+void blobs_getinfo (void)
+{
+	struct netif* test_netif_sta = eagle_lwip_getif(STATION_IF);
+	struct netif* test_netif_ap = eagle_lwip_getif(SOFTAP_IF);
+	
+	uassert(!netif_sta || test_netif_sta == netif_sta);
+	uassert(!netif_ap || test_netif_ap == netif_ap);
+	
+	netif_sta = test_netif_sta;
+	netif_ap = test_netif_ap;
 }
 
 // some checks + give netif index
 static int esp_netif_update (struct netif* netif)
 {
-	uassert(   (   netif == netif_sta
-		    || netif == netif_ap)
-		&& netif->input == ethernet_input
-		&& netif->output == etharp_output
-		&& netif->linkoutput == linkoutput);
+	blobs_getinfo();
+
+	uassert(netif->input == ethernet_input);
+	uassert(netif->output == etharp_output);
 
 	int netif_idx;
 	if (netif == netif_sta)
@@ -249,18 +265,6 @@ static int esp_netif_update (struct netif* netif)
 		/*netif->state*/);
 	
 	return netif_idx;
-}
-
-void blobs_getinfo (void)
-{
-	netif_sta = eagle_lwip_getif(STATION_IF);
-	netif_ap = eagle_lwip_getif(SOFTAP_IF);
-	if (netif_sta)
-		linkoutput = netif_sta->linkoutput;
-	else if (netif_ap)
-		linkoutput = netif_ap->linkoutput;
-	else
-		linkoutput = NULL;
 }
 
 ///////////////////////////////////////
@@ -319,8 +323,6 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 	stub_display_netif(netif);
 	
 	int netif_idx = esp_netif_update(netif);
-	if (netif_idx < 0)
-		return ERR_ABRT;
 
 	uassert(p->tot_len == p->len && p->ref == 1);
 	
@@ -332,10 +334,11 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 	}
 #endif
 
-	// copy data to glue pbuf even if it is a ref
-		
+	// copy esp pbuf to glue pbuf
+
 	void* glue_pbuf;
 	void* glue_data;
+
 	// ask glue for space to store payload into
 	esp2glue_alloc_for_recv(p->len, &glue_pbuf, &glue_data);
 	if (!glue_pbuf)
@@ -424,17 +427,10 @@ err_t dhcp_start (struct netif* netif)
 
 	blobs_getinfo();
 	
-	//STUB(dhcp_start);
-
 	uprint("WRAP: dhcp_start ");
 	stub_display_netif(netif);
 
-	// dhcp is for supposed to be for station only
-	// at this point netif_sta is not yet initialized
-	if (esp_netif_update(netif) < 0)
-		return ERR_ABRT;
-	// now it is
-
+	esp_netif_update(netif);
 	return glue2esp_err(esp2glue_dhcp_start());
 }
 
@@ -473,6 +469,8 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	//uprint(" state=%p init=%p input=%p ", state, init, packet_incoming);
 	//stub_display_netif(netif);
 	//uprint("\n");
+	
+	blobs_getinfo();
 	
 	//////////////////////////////
 	// this is revisited ESP lwip implementation
@@ -534,7 +532,7 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	#endif /* LWIP_IGMP */
 	//////////////////////////////
 
-	uprint("WRAP: netif add ");
+	uprint("WRAP: netif add:\n");
 	netif_set_addr(netif, ipaddr, netmask, gw);
 	
 	return netif;
@@ -564,14 +562,11 @@ void netif_remove (struct netif *netif)
 void netif_set_addr (struct netif* netif, ip_addr_t* ipaddr, ip_addr_t* netmask, ip_addr_t* gw)
 {
 	blobs_getinfo();
-	int netif_idx = esp_netif_update(netif);
 
 	netif->ip_addr.addr = ipaddr->addr;
 	netif->netmask.addr = netmask->addr;
 	netif->gw.addr = gw->addr;
-
-	uprint("WRAP: netif_set_addr ");
-	stub_display_netif(netif);
+	int netif_idx = esp_netif_update(netif);
 
 	// tell blobs
 	struct ip_info set;
@@ -579,16 +574,9 @@ void netif_set_addr (struct netif* netif, ip_addr_t* ipaddr, ip_addr_t* netmask,
 	set.netmask.addr = netmask->addr;
 	set.gw.addr = gw->addr;
 	wifi_set_ip_info(netif_idx, &set);
-	
-	// tell new stack
-	esp2glue_netif_updated(
-		netif_idx,
-		ipaddr->addr,
-		netmask->addr,
-		gw->addr,
-		esp2glue_netif_flags(netif->flags),
-		netif->hwaddr_len,
-		netif->hwaddr);
+
+	uprint("WRAP: netif_set_addr ");
+	stub_display_netif(netif);
 }
 
 /**
@@ -597,7 +585,7 @@ void netif_set_addr (struct netif* netif, ip_addr_t* ipaddr, ip_addr_t* netmask,
  *
  * @param netif the default network interface
  */
-void netif_set_default (struct netif *netif)
+void netif_set_default (struct netif* netif)
 {
 	uprint("WRAP: netif_set_default ");
 	stub_display_netif(netif);
@@ -614,12 +602,12 @@ void netif_set_default (struct netif *netif)
  * 
  * @see dhcp_start()
  */ 
-void netif_set_down(struct netif *netif)
+void netif_set_down (struct netif* netif)
 {
 	uprint("WRAP: netif_set_down  ");
 	stub_display_netif(netif);
 	
-	netif->flags &= ~(NETIF_FLAG_UP | NETIF_FLAG_LINK_UP);
+	netif->flags &= ~NETIF_FLAG_UP;
 	esp_netif_update(netif);
 }
 
@@ -637,7 +625,7 @@ void netif_set_up (struct netif* netif)
 	uprint("WRAP: netif_set_up ");
 	stub_display_netif(netif);
 
-	netif->flags |= (NETIF_FLAG_UP | NETIF_FLAG_LINK_UP);
+	netif->flags |= NETIF_FLAG_UP;
 	esp_netif_update(netif);
 }
 
@@ -827,7 +815,7 @@ void pbuf_ref (struct pbuf *p)
  */
 void sys_timeout(u32_t msecs, sys_timeout_handler handler, void *arg)
 {
-(void)msecs; (void)handler; (void)arg;
+	(void)msecs; (void)handler; (void)arg;
 	STUB(sys_timeout);
 }
 

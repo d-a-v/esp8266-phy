@@ -8,6 +8,7 @@
 
 void dump (const char* what, const char* data, uint16_t len);
 void display_ip32 (const char* pre, uint32_t ip);
+void display_mac (const uint8_t* mac);
 void display_ip_info (const struct ip_info* i);
 
 #endif // BUFPRINT_H
