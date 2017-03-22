@@ -67,9 +67,10 @@ int doprint (const char* format, ...)
 			doprint_direct("<buffered:");
 			if (rotsmall)
 				doprint_direct("(%dcharslost):", rotsmall);
+			ets_putc('\n');
 			for (; rotin != rotout; ret++, rotin = (rotin + 1) & ROTBUFLEN_MASK)
 				ets_putc(rotbuf[rotin]);
-			doprint_direct(":dereffub>");
+			doprint_direct(":dereffub>\n");
 			os_free(rotbuf);
 			rotbuf = NULL;
 		}

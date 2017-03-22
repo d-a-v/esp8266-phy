@@ -93,7 +93,7 @@ u8_t glue2git_netif_flags (glue_netif_flags_t flags)
 	CF(IGMP);
 	#undef CF
 	if (flags)
-		uerror("ERROR: esp2glue_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
+		uerror("ERROR: glue2git_netif_flags: remaining flags not converted (0x%x->0x%x)\n", copy, flags);
 	return nf;
 }
 
@@ -110,6 +110,28 @@ static void new_display_netif_flags (int flags)
 	#undef IFF
 }
 
+static const char* new_netif_name (struct netif* netif)
+{
+	uassert(netif == netif_sta || netif == netif_ap);
+	return netif == netif_ap? "AP": "STA";
+}
+
+static void new_display_netif (struct netif* netif)
+{
+	
+	uprint("lwip-@%p %s name=%c%c%d mtu=%d state=%p flags=",
+		netif,
+		new_netif_name(netif),
+		netif->name[0], netif->name[1], netif->num,
+		netif->mtu,
+		netif->state);
+	new_display_netif_flags(netif->flags);
+	display_ip32(" ip=", netif->ip_addr.addr);
+	display_ip32(" mask=", netif->netmask.addr);
+	display_ip32(" gw=", netif->gw.addr);
+	uprint("\n");
+}
+
 int lwiperr_check (const char* what, err_t err)
 {
 	if (err != ERR_OK)
@@ -122,9 +144,10 @@ int lwiperr_check (const char* what, err_t err)
 
 err_glue_t esp2glue_dhcp_start ()
 {
-	uprint("GLUE: dhcp_start netif@%p\n", netif_sta);
+	uprint("GLUE: dhcp_start netif: ");
+	new_display_netif(netif_sta);
 	err_t err = dhcp_start(netif_sta);
-	uprint("new_dhcp_start returns %d\n", err);
+	uprint("GLUE: new_dhcp_start returns %d\n", err);
 	return new2glue_err(err);
 }
 
@@ -160,7 +183,7 @@ void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
 
 err_t new_linkoutput (struct netif *netif, struct pbuf *p)
 {
-	uprint("GLUE: linkoutput netif@%p pbuf@%p len=%d totlen=%d type=%d\n", netif, p, p->len, p->tot_len, p->type);
+	uprint("GLUE: linkoutput netif-%s pbuf@%p len=%d totlen=%d type=%d\n", new_netif_name(netif), p, p->len, p->tot_len, p->type);
 	//dump("SENDING", p->payload, p->len);
 	pbuf_ref(p); // freed by esp2glue_ref_freed() below
 	return glue2git_err(glue2esp_linkoutput(netif == netif_sta? STATION_IF: SOFTAP_IF, p, p->payload, p->len));
@@ -181,12 +204,8 @@ static err_t new_input (struct pbuf *p, struct netif *inp)
 
 static void netif_status_callback (struct netif* netif)
 {
-	uprint("GLUE: netif status callback: flags=");
-	new_display_netif_flags(netif->flags);
-	display_ip32(" ip=", netif->ip_addr.addr);
-	display_ip32(" mask=", netif->netmask.addr);
-	display_ip32(" gw=", netif->gw.addr);
-	uprint("\n");
+	uprint("GLUE: netif status callback ");
+	new_display_netif(netif);
 	
 	if (netif->flags & NETIF_FLAG_LINK_UP)
 	{
@@ -195,16 +214,16 @@ static void netif_status_callback (struct netif* netif)
 		// tell ESP that link is up
 		glue2esp_ifup(netif == netif_sta? STATION_IF: SOFTAP_IF, netif->ip_addr.addr, netif->netmask.addr, netif->gw.addr);
 
-		if (netif == netif_sta)
+		//if (netif == netif_sta)
 			// this is our default route
 			netif_set_default(netif);
 	}
 }
 
-static char setup_netif (int netif_idx)
+static void setup_netif (int netif_idx)
 {
 	if (netif_git_initialized[netif_idx])
-		return 0;
+		return;
 	netif_git_initialized[netif_idx] = 1;
 	struct netif* netif = &netif_git[netif_idx];
 
@@ -342,8 +361,6 @@ static char setup_netif (int netif_idx)
 		  u16_t loop_cnt_current;
 		#endif /* LWIP_LOOPBACK_MAX_PBUFS */
 		#endif /* ENABLE_LOOPBACK */
-
-	return 1;
 };
 
 void esp2glue_lwip_init (void)
@@ -354,13 +371,15 @@ void esp2glue_lwip_init (void)
 	lwip_init();
 }
 
-void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, uint32_t flags, uint32_t hwlen, const uint8_t* hw /*, void* state*/)
+void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, glue_netif_flags_t flags, uint32_t hwlen, const uint8_t* hw /*, void* state*/)
 {
 
 //XXX blorgl here. netif can be updated from both side. two-way update to setup
 
 	struct netif* netif = &netif_git[netif_idx];
-	setup_netif(netif_idx);
+
+	if (!netif_git_initialized[netif_idx])
+		setup_netif(netif_idx);
 	
 	if (!netif->ip_addr.addr)
 	{
@@ -387,9 +406,8 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 			hostname_sta[0] = 0;
 	}
 	
-	uprint("GLUE: netif(%s) updated up by ESP: flags=", netif_name[netif_idx]);
-	new_display_netif_flags(netif->flags);
-	nl();
+	uprint("GLUE: netif updated: ");
+	new_display_netif(netif);
 }
 
 void esp2glue_alloc_for_recv (size_t len, void** pbuf, void** data)
