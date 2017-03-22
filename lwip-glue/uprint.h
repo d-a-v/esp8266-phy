@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 
+#include "glue.h"
 #include "lwipopts.h" // struct ip_info
 
 #if UDEBUG

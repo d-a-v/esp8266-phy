@@ -97,6 +97,8 @@ u8_t glue2git_netif_flags (glue_netif_flags_t flags)
 	return nf;
 }
 
+#if UDEBUG
+
 static void new_display_netif_flags (int flags)
 {
 	#define IFF(x)	do { if (flags & NETIF_FLAG_##x) uprint("|" #x); } while (0)
@@ -133,6 +135,13 @@ static void new_display_netif (struct netif* netif)
 	display_ip32(" gw=", netif->gw.addr);
 	uprint("\n");
 }
+
+#else // !UDEBUG
+
+#define new_display_netif_flags(x) do { (void)0; } while (0)
+#define new_display_netif(x) do { (void)0; } while (0)
+
+#endif // !UDEBUG
 
 int lwiperr_check (const char* what, err_t err)
 {
@@ -183,18 +192,96 @@ void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
 #endif
 }
 
-err_t new_linkoutput (struct netif *netif, struct pbuf *p)
+err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 {
-	uprint("GLUE: linkoutput netif-%s pbuf@%p len=%d totlen=%d type=%d\n", new_netif_name(netif), p, p->len, p->tot_len, p->type);
-	//dump("SENDING", p->payload, p->len);
-	pbuf_ref(p); // freed by esp2glue_ref_freed() below
-	err_t err = glue2git_err(glue2esp_linkoutput(netif == netif_sta? STATION_IF: SOFTAP_IF, p, p->payload, p->len));
-	uprint("GLUE: linkoutput ret=%d\n", err);
+	int netif_idx = netif == netif_sta? STATION_IF: SOFTAP_IF;
+	err_t err = ERR_OK;
+	struct pbuf* head = p;
+	
+#if 1
+	struct pbuf* q = p;
+	size_t r = q->tot_len;
+	while (r > 0)
+	{
+		r -= q->len;
+		q = q->next;
+	}
+	if (q)
+		uprint("ERROR IN CHAIN BEFORE %p\n", q);
+#endif
+	
+	
+	while (1)
+	{
+		uprint("GLUE: linkoutput netif-%s pbuf@%p len=%d totlen=%d type=%d\n", new_netif_name(netif), p, p->len, p->tot_len, p->type);
+		//dump("SENDING", p->payload, p->len);
+
+		pbuf_ref(p); // freed by esp2glue_ref_freed() below
+		uprint("GLUE send ref=%d->%d\n", p->ref-1, p->ref);
+
+		size_t remain = p->tot_len - p->len;
+
+		err = glue2git_err(glue2esp_linkoutput(
+			netif_idx,
+			p->len == p->tot_len? head: NULL, // last chunk, pass head to release
+			p->payload,
+			p->len));
+		
+		uprint("GLUE: linkoutput ret=%d\n", err);
+		if (err != ERR_OK)
+		{
+			uprint("GLUE: error sending pbuf@%p\n", p);
+			pbuf_free(p); // decrease the pbuf_ref() above
+			break;
+		}
+
+		uprint("GLUE: remain size=%d next pbuf is @%p\n", remain, p->next);
+
+		if (!remain)
+			break;
+
+		p = p->next;
+	}
+
+#if 1
+uprint("A\n");
+	struct pbuf* qq = head;
+	size_t rr = qq->tot_len;
+uprint("B\n");
+	while (rr > 0)
+	{
+		rr -= qq->len;
+uprint("C qq=%p next=%p\n", qq, qq->next);
+		qq = qq->next;
+uprint("D\n");
+
+// chain is damaged. check esp-pbuf->eb and EP_OFFSET / PBUF_LINK_ENCAPSULATION_HLEN honoured in esp-pbuf_alloc
+// check if in lwip-git/pbuf_alloc PBUF_LINK_ENCAPSULATION_HLEN is honoured as in original esp-pbuf_alloc
+
+	}
+	if (qq)
+		uprint("ERROR IN CHAIN AFTER %p\n", qq);
+	else
+		uprint("CHAIN OK\n");
+#endif
 	return err;
 }
 
 void esp2glue_ref_freed (void* pbuf)
 {
+	uprint("GLUE: blobs release lwip-pbuf (ref=%d) @%p\n", ((struct pbuf*)pbuf)->ref, pbuf);
+#if 1
+	struct pbuf* q = pbuf;
+	size_t r = q->tot_len;
+	while (r > 0)
+	{
+		uprint("release ref=%d @%p\n", q->ref, q);
+		r -= q->len;
+		q = q->next;
+	}
+	if (q)
+		uprint("ERROR IN CHAIN %p\n", q);
+#endif
 	pbuf_free((struct pbuf*)pbuf);
 }
 

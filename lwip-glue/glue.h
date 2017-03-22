@@ -10,7 +10,7 @@
 #include "uprint.h"
 #include "doprint.h"
 
-#define UDEBUG 0	// 0 or 1
+#define UDEBUG 1	// 0 or 1
 
 #if UDEBUG
 #define uprint(x...)	do { doprint(x); } while (0)

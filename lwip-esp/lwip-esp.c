@@ -95,6 +95,7 @@ err_glue_t esp2glue_err (err_glue_t err)
 	}
 };
 
+
 glue_netif_flags_t esp2glue_netif_flags (u8_t flags)
 {
 
@@ -143,11 +144,10 @@ static void stub_display_netif_flags (int flags)
 static void stub_display_netif (struct netif* netif)
 {
 	uassert(netif == netif_sta || netif == netif_ap);
-	uprint("esp-@%p %s name=%c%c%d mtu=%d state=%p ",
+	uprint("esp-@%p %s name=%c%c%d state=%p ",
 		netif,
 		netif == netif_ap? "AP": "STA",
 		netif->name[0], netif->name[1], netif->num,
-		netif->mtu,
 		netif->state);
 	if (netif->hwaddr_len == 6)
 		display_mac(netif->hwaddr);
@@ -191,14 +191,15 @@ void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type
 #define PBUF_CUSTOM_NUMBER 8
 struct pbuf_wrapper
 {
-	void* ref;	// for glue2git_linkoutput_pbuf_released(void*)
+	int used;
+	void* ref2save;	// for glue2git_linkoutput_pbuf_released(void*), can be NULL
 	struct pbuf pbuf;
 } pbuf_wrappers[PBUF_CUSTOM_NUMBER];
 
 struct pbuf_wrapper* get_free_pbuf_wrapper (void)
 {
 	int i = 0;
-	while (i < PBUF_CUSTOM_NUMBER && pbuf_wrappers[i].ref)
+	while (i < PBUF_CUSTOM_NUMBER && pbuf_wrappers[i].used)
 		i++;
 	if (i < PBUF_CUSTOM_NUMBER)
 		return &pbuf_wrappers[i];
@@ -215,7 +216,8 @@ err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, char* rawdata, si
 		return GLUE_ERR_ABRT;
 	
 	// reference lwip buffer to send
-	p->ref = ref2save;
+	p->used = 1;
+	p->ref2save = ref2save;
 	p->pbuf.payload = rawdata;
 	p->pbuf.len = p->pbuf.tot_len = size;
 	p->pbuf.next = NULL;
@@ -225,9 +227,10 @@ err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, char* rawdata, si
 
 	struct netif* netif = netif_esp[netif_idx];
 
-	uprint("LINKOUTPUT: real packet sent to wilderness (%dB pb=%p netif=esp-%p)\n",
+	uprint("LINKOUTPUT: real packet sent to wilderness (%dB pbuf=%p gluepbuf=%p netif=esp-%p)\n",
 		(int)size,
 		&p->pbuf,
+		p->ref2save,
 		netif);
 	
 	// call blobs
@@ -284,7 +287,7 @@ void lwip_init_RENAMED (void); //XXX should use esp2glue_lwip_init()
 void lwip_init (void)
 {
 	for (int i = 0; i < PBUF_CUSTOM_NUMBER; i++)
-		pbuf_wrappers[i].ref = NULL;
+		pbuf_wrappers[i].used = 0;
 	
 	blobs_getinfo();
 	
@@ -777,14 +780,17 @@ u8_t pbuf_free (struct pbuf *p)
 	if (p->type == PBUF_CUSTOM_TYPE_STATIC)
 	{
 		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)( (char*)p - ((char*)&pbuf_wrappers[0].pbuf - (char*)&pbuf_wrappers[0]) );
-		// pw->ref is the lwip2 pbuf to release, the current lwip1 pbuf points inside it
-		uprint("WRAP: pbuf_free release lwip2 pbuf %p lwip1 %p\n", pw->ref, &pw->pbuf);
-		esp2glue_ref_freed(pw->ref);
-		pw->ref = NULL; // release our pooled static pbuf_wrapper
 
+		// pw->ref is the lwip2 pbuf to release, the current lwip1 pbuf points inside it
+		uprint("WRAP: pbuf_free release lwip2 pbuf %p lwip1 %p\n", pw->ref2save, &pw->pbuf);
+		if (pw->ref2save)
+			esp2glue_ref_freed(pw->ref2save);
+			
 		if (pw->pbuf.ref != 1)
 			uprint("ERROR bad pbuf_wrapper ref=%d\n", pw->pbuf.ref);
 		
+		pw->used = 0; // release our pooled static pbuf_wrapper
+
 		return 1;
 	}
 		
@@ -812,10 +818,8 @@ u8_t pbuf_free (struct pbuf *p)
  */
 void pbuf_ref (struct pbuf *p)
 {
-	//STUB(pbuf_ref);
-	uprint("WRAP: pbuf_ref(%p) ref=%d\n", p, p->ref);
-	if (p)
-		++(p->ref);
+	uprint("WRAP: pbuf_ref(%p) ref=%d->%d\n", p, p->ref, p->ref + 1);
+	++(p->ref);
 }
 
 /**

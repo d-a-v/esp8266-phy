@@ -20,7 +20,7 @@ typedef int sys_prot_t;	// not really used
 
 ///////////////////////////////
 //// DEBUG
-#if 0 // debug 1:on or 0
+#if 1 // debug 1:on or 0
 
 //#define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH|LWIP_DBG_HALT)
 #define LWIP_DBG_TYPES_ON		(LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH)
@@ -87,7 +87,7 @@ extern ip4_addr_t* ntp_servers;
 #define pbuf_ref pbuf_ref_RENAMED
 //#define sys_check_timeouts sys_check_timeouts_RENAMED		// void(void)
 
-#ifndef LWIP_DEBUG
+#if !defined(LWIP_DEBUG) || !SYS_DEBUG
 #define sys_timeout sys_timeout_RENAMED
 #endif
 

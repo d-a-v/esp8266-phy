@@ -2,8 +2,6 @@
 #ifndef MYLWIPOPTS_H
 #define MYLWIPOPTS_H
 
-#include "arch/cc.h"
-
 /**
  * @file
  *
@@ -2724,14 +2722,14 @@
  * ETHARP_DEBUG: Enable debugging in etharp.c.
  */
 #if !defined ETHARP_DEBUG || defined __DOXYGEN__
-#define ETHARP_DEBUG                    LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define ETHARP_DEBUG                    LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
  * NETIF_DEBUG: Enable debugging in netif.c.
  */
 #if !defined NETIF_DEBUG || defined __DOXYGEN__
-#define NETIF_DEBUG                     LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define NETIF_DEBUG                     LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
@@ -2745,14 +2743,14 @@
  * API_LIB_DEBUG: Enable debugging in api_lib.c.
  */
 #if !defined API_LIB_DEBUG || defined __DOXYGEN__
-#define API_LIB_DEBUG                   LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define API_LIB_DEBUG                   LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
  * API_MSG_DEBUG: Enable debugging in api_msg.c.
  */
 #if !defined API_MSG_DEBUG || defined __DOXYGEN__
-#define API_MSG_DEBUG                   LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define API_MSG_DEBUG                   LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
@@ -2766,14 +2764,14 @@
  * ICMP_DEBUG: Enable debugging in icmp.c.
  */
 #if !defined ICMP_DEBUG || defined __DOXYGEN__
-#define ICMP_DEBUG                      LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define ICMP_DEBUG                      LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
  * IGMP_DEBUG: Enable debugging in igmp.c.
  */
 #if !defined IGMP_DEBUG || defined __DOXYGEN__
-#define IGMP_DEBUG                      LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define IGMP_DEBUG                      LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
@@ -2787,7 +2785,7 @@
  * IP_DEBUG: Enable debugging for IP.
  */
 #if !defined IP_DEBUG || defined __DOXYGEN__
-#define IP_DEBUG                        LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define IP_DEBUG                        LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
@@ -2808,21 +2806,21 @@
  * MEM_DEBUG: Enable debugging in mem.c.
  */
 #if !defined MEM_DEBUG || defined __DOXYGEN__
-#define MEM_DEBUG                       LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define MEM_DEBUG                       LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
  * MEMP_DEBUG: Enable debugging in memp.c.
  */
 #if !defined MEMP_DEBUG || defined __DOXYGEN__
-#define MEMP_DEBUG                      LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define MEMP_DEBUG                      LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
  * SYS_DEBUG: Enable debugging in sys.c.
  */
 #if !defined SYS_DEBUG || defined __DOXYGEN__
-#define SYS_DEBUG                       LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define SYS_DEBUG                       LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
@@ -2900,7 +2898,7 @@
  * UDP_DEBUG: Enable debugging in UDP.
  */
 #if !defined UDP_DEBUG || defined __DOXYGEN__
-#define UDP_DEBUG                       LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define UDP_DEBUG                       LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
@@ -2914,28 +2912,28 @@
  * SLIP_DEBUG: Enable debugging in slipif.c.
  */
 #if !defined SLIP_DEBUG || defined __DOXYGEN__
-#define SLIP_DEBUG                      LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define SLIP_DEBUG                      LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
  * DHCP_DEBUG: Enable debugging in dhcp.c.
  */
 #if !defined DHCP_DEBUG || defined __DOXYGEN__
-#define DHCP_DEBUG                      LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define DHCP_DEBUG                      LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
  * AUTOIP_DEBUG: Enable debugging in autoip.c.
  */
 #if !defined AUTOIP_DEBUG || defined __DOXYGEN__
-#define AUTOIP_DEBUG                    LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define AUTOIP_DEBUG                    LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
  * DNS_DEBUG: Enable debugging for DNS.
  */
 #if !defined DNS_DEBUG || defined __DOXYGEN__
-#define DNS_DEBUG                       LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
+#define DNS_DEBUG                       LWIP_DBG_OFF//LWIP_DBG_OFF
 #endif
 
 /**
@@ -2970,5 +2968,6 @@
  */
 
 #include "lwip/debug.h"
+#include "arch/cc.h"
 
 #endif // MYLWIPOPTS_H
