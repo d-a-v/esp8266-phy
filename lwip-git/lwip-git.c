@@ -217,67 +217,50 @@ uprint("D");
 }
 #endif
 
-err_t new_linkoutput (struct netif* netif, struct pbuf* p)
+err_t new_linkoutput (struct netif* netif, struct pbuf* head)
 {
+
+uassert(head->next == NULL); ///XXXFIXME REWRITE/SIMPLIFY FOR ONE UNCHAINED PBUF
+
 	int netif_idx = netif == netif_sta? STATION_IF: SOFTAP_IF;
-	err_t err = ERR_OK;
-	struct pbuf* head = p;
+	struct pbuf* p;
+	void* esp_head = NULL;
 	
-	
-	while (1)
-	{
-		uprint("GLUE: linkoutput netif-%s pbuf@%p len=%d totlen=%d type=%d\n", new_netif_name(netif), p, p->len, p->tot_len, p->type);
-		//dump("SENDING", p->payload, p->len);
-
-		pbuf_ref(p); // freed by esp2glue_ref_freed() below
-		uprint("GLUE send ref=%d->%d\n", p->ref-1, p->ref);
-
-		size_t remain = p->tot_len - p->len;
+	// reserve pbuf in esp side
+	void* first = NULL;
+	void* last = NULL;
+	for (p = head; p; p = p->next)
+		if (glue2esp_reserve_pbuf_chain(&first, &last, head, p->payload, p->tot_len, p->len) == GLUE_ERR_MEM)
+			return ERR_MEM;
 
 check_chain("1", head);
-		err = glue2git_err(glue2esp_linkoutput(
-			netif_idx,
-			p->len == p->tot_len? head: NULL, // last chunk, pass head to release
-			p->payload,
-			p->len));
+	if (p)
+		return ERR_MEM;
+	
+	// ref pbuf in our side
+	// esp will be free them with esp2glue_ref_freed() below
+	for (p = head; p; p = p->next)
+		pbuf_ref(p);
+
+	// tell esp the chain is ready to be sent
+	err_t err = glue2git_err(glue2esp_linkoutput(first, netif == netif_sta? STATION_IF: SOFTAP_IF));
 check_chain("2", head);
-		
-		uprint("GLUE: linkoutput ret=%d\n", err);
-		if (err != ERR_OK)
-		{
-			uprint("GLUE: error sending pbuf@%p\n", p);
-			pbuf_free(p); // decrease the pbuf_ref() above
-			break;
-		}
-
-		uprint("GLUE: remain size=%d next pbuf is @%p\n", remain, p->next);
-
-		if (!remain)
-			break;
-
-		p = p->next;
+	if (err != ERR_OK)
+	{
+		pbuf_free(head);
+		uprint("GLUE: linkoutput error sending pbuf@%p\n", p);
+		return err;
 	}
-
+		
 check_chain("3", head);
 
-	return err;
+	return ERR_OK;
 }
 
-void esp2glue_ref_freed (void* pbuf)
+void esp2glue_pbuf_freed (void* pbuf)
 {
 	uprint("GLUE: blobs release lwip-pbuf (ref=%d) @%p\n", ((struct pbuf*)pbuf)->ref, pbuf);
-#if 1
-	struct pbuf* q = pbuf;
-	size_t r = q->tot_len;
-	while (r > 0)
-	{
-		uprint("release ref=%d @%p\n", q->ref, q);
-		r -= q->len;
-		q = q->next;
-	}
-	if (q)
-		uprint("ERROR IN CHAIN %p\n", q);
-#endif
+check_chain("4", (struct pbuf*)pbuf);
 	pbuf_free((struct pbuf*)pbuf);
 }
 

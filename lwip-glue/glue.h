@@ -10,7 +10,7 @@
 #include "uprint.h"
 #include "doprint.h"
 
-#define UDEBUG 1	// 0 or 1
+#define UDEBUG 0	// 0 or 1
 
 #if UDEBUG
 #define uprint(x...)	do { doprint(x); } while (0)
@@ -63,10 +63,11 @@ err_glue_t	esp2glue_dhcp_start	(void);
 void		esp2glue_netif_updated	(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, glue_netif_flags_t flags, size_t hwlen, const uint8_t* hw /*, void* state*/);
 err_glue_t	esp2glue_ethernet_input	(int netif_idx, void* glue_pbuf);
 void		esp2glue_alloc_for_recv	(size_t len, void** glue_pbuf, void** glue_data);
-
-err_glue_t	glue2esp_linkoutput	(int netif_idx, void* ref2save, char* rawdata, size_t size);
-void		esp2glue_ref_freed	(void* ref_saved);
+void		esp2glue_pbuf_freed	(void* ref_saved);
 
 void		glue2esp_ifup		(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw);
+
+err_glue_t	glue2esp_reserve_pbuf_chain (void** vfirst, void** vlast, void* ref2save, void* data, size_t tot_len, size_t len);
+err_glue_t	glue2esp_linkoutput	(void* vfirst, int netif_idx);
 
 #endif // GLUE_STUB_H

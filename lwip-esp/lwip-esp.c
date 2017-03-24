@@ -187,7 +187,7 @@ void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type
 ///////////////////////////////////////
 // quick pool to store references to data sent
 
-#define PBUF_CUSTOM_TYPE_STATIC 0x42 // must not conflict with PBUF_* (pbuf types)
+#define PBUF_CUSTOM_TYPE_POOLED 0x42 // must not conflict with PBUF_* (pbuf types)
 #define PBUF_CUSTOM_NUMBER 8
 struct pbuf_wrapper
 {
@@ -198,45 +198,72 @@ struct pbuf_wrapper
 
 struct pbuf_wrapper* get_free_pbuf_wrapper (void)
 {
-	int i = 0;
-	while (i < PBUF_CUSTOM_NUMBER && pbuf_wrappers[i].used)
-		i++;
-	if (i < PBUF_CUSTOM_NUMBER)
-		return &pbuf_wrappers[i];
+	struct pbuf_wrapper* p = &pbuf_wrappers[0];
+	while (p < &pbuf_wrappers[PBUF_CUSTOM_NUMBER] && p->used)
+		p++;
+	if (p < &pbuf_wrappers[PBUF_CUSTOM_NUMBER])
+	{
+		p->used = 1;
+		return p;
+	}
 	uerror("ERROR: not enough pbuf_wrapper\n");
 	return NULL;
 }
 
-// output real packet here:
-err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, char* rawdata, size_t size)
+err_glue_t glue2esp_reserve_pbuf_chain (void** vfirst, void** vlast, void* ref2save, void* data, size_t tot_len, size_t len)
 {
+	struct pbuf_wrapper** first = (struct pbuf_wrapper**)vfirst;
+	struct pbuf_wrapper** last =  (struct pbuf_wrapper**)vlast;
+
 	// get a free pbuf wrapper
 	struct pbuf_wrapper* p = get_free_pbuf_wrapper();
 	if (!p)
-		return GLUE_ERR_ABRT;
+	{
+		// no memory for a chunk
+		// if it is not the first,
+		// then use our deallocatator pbuf_free
+		if (*first)
+			pbuf_free(&(*first)->pbuf);
+		return GLUE_ERR_MEM;
+	}
 	
-	// reference lwip buffer to send
-	p->used = 1;
-	p->ref2save = ref2save;
-	p->pbuf.payload = rawdata;
-	p->pbuf.len = p->pbuf.tot_len = size;
+	if (!*first)
+		*first = p;
+	else
+		(*last)->pbuf.next = &p->pbuf;
+	*last = p;
 	p->pbuf.next = NULL;
-	p->pbuf.type = PBUF_CUSTOM_TYPE_STATIC;
-	p->pbuf.ref = 0;
+	p->ref2save = ref2save;
+	
+	p->pbuf.payload = data;
+	p->pbuf.len = len;
+	p->pbuf.tot_len = tot_len;
+	p->pbuf.type = PBUF_CUSTOM_TYPE_POOLED;
+	p->pbuf.ref = 0; // will be increased by netif->linkouput() below
 	p->pbuf.flags = 0;
+	
+	uprint("WRAP: reserved 1 glue-pbuf %p esp-pbuf %p\n", ref2save, &p->pbuf);
 
+	return GLUE_ERR_OK;
+}
+
+
+// output real packet here:
+err_glue_t glue2esp_linkoutput (void* vfirst, int netif_idx)
+{
 	struct netif* netif = netif_esp[netif_idx];
+	struct pbuf_wrapper* first = (struct pbuf_wrapper*)vfirst;
 
-	uprint("LINKOUTPUT: real packet sent to wilderness (%dB pbuf=%p gluepbuf=%p netif=esp-%p)\n",
-		(int)size,
-		&p->pbuf,
-		p->ref2save,
+	uprint("LINKOUTPUT: real pbuf sent to wilderness (totlen=%dB pbuf=%p gluepbuf=%p netif=esp-%p)\n",
+		first->pbuf.tot_len,
+		&first->pbuf,
+		first->ref2save,
 		netif);
 	
 	// call blobs
 	// blobs will call pbuf_free() back later
 	// we will retreive our ref2save and give it back to glue
-	return esp2glue_err(netif->linkoutput(netif, &p->pbuf));
+	return esp2glue_err(netif->linkoutput(netif, &first->pbuf));
 }
 
 void blobs_getinfo (void)
@@ -354,17 +381,18 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 
 	// ask glue for space to store payload into
 	esp2glue_alloc_for_recv(p->len, &glue_pbuf, &glue_data);
-	if (!glue_pbuf)
-	{
-		pbuf_free(p);
-		return ERR_MEM;
-	}
 
-	// copy data
-	os_memcpy(glue_data, p->payload, p->len);
+	if (glue_pbuf)
+		// copy data
+		os_memcpy(glue_data, p->payload, p->len);
+
 	// release asap blob's buffer
 	// thus avoiding the BMOD "LmacRxBlk:1"
 	pbuf_free(p);
+
+	if (!glue_pbuf)
+		return ERR_MEM;
+
 	// pass to new ip stack
 	return glue2esp_err(esp2glue_ethernet_input(netif_idx, glue_pbuf));
 }
@@ -777,20 +805,29 @@ u8_t pbuf_free (struct pbuf *p)
 	#error LWIP_SUPPORT_CUSTOM_PBUF is defined
 	#endif
 
-	uassert(p->ref == 1);
-
-	if (p->type == PBUF_CUSTOM_TYPE_STATIC)
+	if (p->type == PBUF_CUSTOM_TYPE_POOLED)
 	{
-		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)( (char*)p - ((char*)&pbuf_wrappers[0].pbuf - (char*)&pbuf_wrappers[0]) );
-
-		// pw->ref2save is the lwip2 pbuf to release, the current lwip1 pbuf points inside it
-		uprint("WRAP: pbuf_free release lwip2 pbuf %p lwip1 %p\n", pw->ref2save, &pw->pbuf);
-		if (pw->ref2save)
-			esp2glue_ref_freed(pw->ref2save);
+		u8_t ret = 0;
+		const long offset = (char*)&pbuf_wrappers[0].pbuf - (char*)&pbuf_wrappers[0];
+		// we have a pbuf chain encapsulated in pbuf_wrapper to remove
+		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)((char*)p - offset);
+		// pw->ref2save is the lwip2 pbuf head to release, the current lwip1 pbuf->payload point inside its chain
+		void* ref2save = pw->ref2save;
+		struct pbuf* q = p;
+		while (q)
+		{
+			uassert(q->ref == 1);
+			pw->used = 0; // release our trivial pool
+			q = q->next;
+			pw = (struct pbuf_wrapper*)((char*)q - offset);
+			ret++;
+		}
+		
+		uprint("WRAP: pbuf_free chain release lwip2-pbuf %p lwip1-pbuf %p\n", ref2save, (char*)p);
+		if (ref2save)
+			esp2glue_pbuf_freed(ref2save);
 			
-		pw->used = 0; // release our pooled static pbuf_wrapper
-
-		return 1;
+		return ret;
 	}
 		
 	if (!p->next && p->ref == 1)
@@ -805,7 +842,6 @@ u8_t pbuf_free (struct pbuf *p)
 	}
 
 	uerror("BAD CASE %p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
-	pbuf_info("BAD CASE", -1, p->len, p->type);
 	return 0;
 }
 

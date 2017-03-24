@@ -1499,7 +1499,7 @@
  * @todo: TCP and IP-frag do not work with this, yet:
  */
 #if !defined LWIP_NETIF_TX_SINGLE_PBUF || defined __DOXYGEN__
-#define LWIP_NETIF_TX_SINGLE_PBUF             0
+#define LWIP_NETIF_TX_SINGLE_PBUF             1 // MANDATORY FOR ESP8266 BLOBS !! 
 #endif /* LWIP_NETIF_TX_SINGLE_PBUF */
 
 /**
