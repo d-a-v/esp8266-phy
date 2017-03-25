@@ -192,75 +192,34 @@ void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
 #endif
 }
 
-#if 1
-void check_chain (const char* pre, struct pbuf* head)
+err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 {
-uprint("%s:A", pre);
-	struct pbuf* qq = head;
-	size_t rr = qq->tot_len;
-uprint("B");
-	while (rr > 0)
-	{
-		rr -= qq->len;
-uprint("C(qq=%p next=%p)", qq, qq->next);
-		qq = qq->next;
-uprint("D");
+	#if !LWIP_NETIF_TX_SINGLE_PBUF
+	#warning ESP netif->linkoutput cannot handle pbuf chains.
+	#error LWIP_NETIF_TX_SINGLE_PBUF must be 1 in lwipopts.h
+	#endif
+	uassert(p->next == NULL);
+	uassert(p->len == p->tot_len);
 
-// chain is damaged. check esp-pbuf->eb and EP_OFFSET / PBUF_LINK_ENCAPSULATION_HLEN honoured in esp-pbuf_alloc
-// check if in lwip-git/pbuf_alloc PBUF_LINK_ENCAPSULATION_HLEN is honoured as in original esp-pbuf_alloc
+	// protect pbuf, so lwip2 won't free it before phy finishes sending
+	pbuf_ref(p);
 
-	}
-	if (qq)
-		uprint("ERROR IN CHAIN AFTER %p\n", qq);
-	else
-		uprint("CHAIN OK\n");
-}
-#endif
+	err_t err = glue2git_err(glue2esp_linkoutput(
+		netif == netif_sta? STATION_IF: SOFTAP_IF,
+		p, p->payload, p->len));
 
-err_t new_linkoutput (struct netif* netif, struct pbuf* head)
-{
-
-uassert(head->next == NULL); ///XXXFIXME REWRITE/SIMPLIFY FOR ONE UNCHAINED PBUF
-
-	int netif_idx = netif == netif_sta? STATION_IF: SOFTAP_IF;
-	struct pbuf* p;
-	void* esp_head = NULL;
-	
-	// reserve pbuf in esp side
-	void* first = NULL;
-	void* last = NULL;
-	for (p = head; p; p = p->next)
-		if (glue2esp_reserve_pbuf_chain(&first, &last, head, p->payload, p->tot_len, p->len) == GLUE_ERR_MEM)
-			return ERR_MEM;
-
-check_chain("1", head);
-	if (p)
-		return ERR_MEM;
-	
-	// ref pbuf in our side
-	// esp will be free them with esp2glue_ref_freed() below
-	for (p = head; p; p = p->next)
-		pbuf_ref(p);
-
-	// tell esp the chain is ready to be sent
-	err_t err = glue2git_err(glue2esp_linkoutput(first, netif == netif_sta? STATION_IF: SOFTAP_IF));
-check_chain("2", head);
 	if (err != ERR_OK)
 	{
-		pbuf_free(head);
+		pbuf_free(p);
 		uprint("GLUE: linkoutput error sending pbuf@%p\n", p);
-		return err;
 	}
-		
-check_chain("3", head);
 
-	return ERR_OK;
+	return err;
 }
 
 void esp2glue_pbuf_freed (void* pbuf)
 {
 	uprint("GLUE: blobs release lwip-pbuf (ref=%d) @%p\n", ((struct pbuf*)pbuf)->ref, pbuf);
-check_chain("4", (struct pbuf*)pbuf);
 	pbuf_free((struct pbuf*)pbuf);
 }
 

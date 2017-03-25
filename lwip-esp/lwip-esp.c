@@ -9,6 +9,7 @@
 
 #include "glue.h"
 
+#define DBG	"LWESP: "
 #define STUB(x) do { uerror("STUB: " #x "\n"); } while (0)
 
 // guessed interface, esp blobs
@@ -160,7 +161,7 @@ static void stub_display_netif (struct netif* netif)
 
 void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type)
 {
-	uerror("WRAP: %s layer=%s(%d) len=%d type=%s(%d)\n",
+	uerror(DBG "%s layer=%s(%d) len=%d type=%s(%d)\n",
 		what,
 		layer==PBUF_TRANSPORT? "transport":
 		layer==PBUF_IP? "ip":
@@ -188,82 +189,78 @@ void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type
 // quick pool to store references to data sent
 
 #define PBUF_CUSTOM_TYPE_POOLED 0x42 // must not conflict with PBUF_* (pbuf types)
-#define PBUF_CUSTOM_NUMBER 8
+#define PBUF_WRAPPER_BLOCK 8
+
 struct pbuf_wrapper
 {
-	int used;
-	void* ref2save;	// for glue2git_linkoutput_pbuf_released(void*), can be NULL
-	struct pbuf pbuf;
-} pbuf_wrappers[PBUF_CUSTOM_NUMBER];
+	struct pbuf pbuf;		// must be first in pbuf_wrapper
+	void* ref2save;			// pointer to keep aside this pbuf
+	struct pbuf_wrapper* next;	// chain of unused
+};
 
-struct pbuf_wrapper* get_free_pbuf_wrapper (void)
+struct pbuf_wrapper* pbuf_wrapper_head = NULL;	// first free
+
+static void pbuf_wrappers_init (void)
 {
-	struct pbuf_wrapper* p = &pbuf_wrappers[0];
-	while (p < &pbuf_wrappers[PBUF_CUSTOM_NUMBER] && p->used)
-		p++;
-	if (p < &pbuf_wrappers[PBUF_CUSTOM_NUMBER])
-	{
-		p->used = 1;
-		return p;
-	}
-	uerror("ERROR: not enough pbuf_wrapper\n");
-	return NULL;
-}
-
-err_glue_t glue2esp_reserve_pbuf_chain (void** vfirst, void** vlast, void* ref2save, void* data, size_t tot_len, size_t len)
-{
-	struct pbuf_wrapper** first = (struct pbuf_wrapper**)vfirst;
-	struct pbuf_wrapper** last =  (struct pbuf_wrapper**)vlast;
-
-	// get a free pbuf wrapper
-	struct pbuf_wrapper* p = get_free_pbuf_wrapper();
+	struct pbuf_wrapper* p = (struct pbuf_wrapper*)os_malloc(sizeof(struct pbuf_wrapper) * PBUF_WRAPPER_BLOCK);
 	if (!p)
+		return;
+	for (int i = 0; i < PBUF_WRAPPER_BLOCK; i++)
 	{
-		// no memory for a chunk
-		// if it is not the first,
-		// then use our deallocatator pbuf_free
-		if (*first)
-			pbuf_free(&(*first)->pbuf);
-		return GLUE_ERR_MEM;
+		p->pbuf.type = PBUF_CUSTOM_TYPE_POOLED;	// constant
+		p->pbuf.flags = 0;			// constant
+		p->pbuf.next = NULL;			// constant
+		p->pbuf.eb = NULL;			// constant
+		p->next = i? p - 1: NULL;
+		p++;
 	}
-	
-	if (!*first)
-		*first = p;
-	else
-		(*last)->pbuf.next = &p->pbuf;
-	*last = p;
-	p->pbuf.next = NULL;
-	p->ref2save = ref2save;
-	
-	p->pbuf.payload = data;
-	p->pbuf.len = len;
-	p->pbuf.tot_len = tot_len;
-	p->pbuf.type = PBUF_CUSTOM_TYPE_POOLED;
-	p->pbuf.ref = 0; // will be increased by netif->linkouput() below
-	p->pbuf.flags = 0;
-	
-	uprint("WRAP: reserved 1 glue-pbuf %p esp-pbuf %p\n", ref2save, &p->pbuf);
-
-	return GLUE_ERR_OK;
+	pbuf_wrapper_head = p - 1;
+	uprint(DBG "allocating %d more linkoutput-ref-pbuf\n", PBUF_WRAPPER_BLOCK);
 }
 
+struct pbuf_wrapper* pbuf_wrapper_get (void)
+{
+	if (!pbuf_wrapper_head)
+		pbuf_wrappers_init();
+	if (!pbuf_wrapper_head)
+		return NULL;
+	struct pbuf_wrapper* ret = pbuf_wrapper_head;
+	pbuf_wrapper_head = pbuf_wrapper_head->next;
+	return ret;
+}
+
+static void pbuf_wrapper_release (struct pbuf_wrapper* p)
+{
+	// make it the new head in the chain of unused
+	p->next = pbuf_wrapper_head;
+	pbuf_wrapper_head = p;
+}
 
 // output real packet here:
-err_glue_t glue2esp_linkoutput (void* vfirst, int netif_idx)
+err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, void* data, size_t size)
 {
-	struct netif* netif = netif_esp[netif_idx];
-	struct pbuf_wrapper* first = (struct pbuf_wrapper*)vfirst;
+	struct pbuf_wrapper* p = pbuf_wrapper_get();
+	if (!p)
+		return GLUE_ERR_MEM;
 
-	uprint("LINKOUTPUT: real pbuf sent to wilderness (totlen=%dB pbuf=%p gluepbuf=%p netif=esp-%p)\n",
-		first->pbuf.tot_len,
-		&first->pbuf,
-		first->ref2save,
-		netif);
+	uassert(p->pbuf.eb == NULL);
+
+	p->pbuf.payload = data;
+	p->pbuf.len = p->pbuf.tot_len = size;
+	p->pbuf.ref = 0;
+	p->ref2save = ref2save;
+	
+	uprint(DBG "LINKOUTPUT: real pbuf sent to wilderness (len=%dB esp-pbuf=%p glue-pbuf=%p netifidx=%d)\n",
+		p->pbuf.len,
+		&p->pbuf,
+		ref2save,
+		netif_idx);
 	
 	// call blobs
 	// blobs will call pbuf_free() back later
 	// we will retreive our ref2save and give it back to glue
-	return esp2glue_err(netif->linkoutput(netif, &first->pbuf));
+	struct netif* netif = netif_esp[netif_idx];
+	return esp2glue_err(netif->linkoutput(netif, &p->pbuf));
 }
 
 void blobs_getinfo (void)
@@ -313,8 +310,7 @@ static int esp_netif_update (struct netif* netif)
 void lwip_init_RENAMED (void); //XXX should use esp2glue_lwip_init()
 void lwip_init (void)
 {
-	for (int i = 0; i < PBUF_CUSTOM_NUMBER; i++)
-		pbuf_wrappers[i].used = 0;
+	pbuf_wrappers_init();
 	
 	blobs_getinfo();
 	
@@ -359,7 +355,7 @@ err_t etharp_output (struct netif* netif, struct pbuf* q, ip_addr_t* ipaddr)
  */
 err_t ethernet_input (struct pbuf* p, struct netif* netif)
 {
-	uprint("WRAP: received (pbuf: %dB ref=%d eb=%p) on netif ", p->tot_len, p->ref, p->eb);
+	uprint(DBG "received (pbuf: %dB ref=%d eb=%p) on netif ", p->tot_len, p->ref, p->eb);
 	stub_display_netif(netif);
 	
 	int netif_idx = esp_netif_update(netif);
@@ -470,7 +466,7 @@ err_t dhcp_start (struct netif* netif)
 
 	blobs_getinfo();
 	
-	uprint("WRAP: dhcp_start ");
+	uprint(DBG "dhcp_start ");
 	stub_display_netif(netif);
 
 	esp_netif_update(netif);
@@ -576,7 +572,7 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 	#endif /* LWIP_IGMP */
 	//////////////////////////////
 
-	uprint("WRAP: netif add:\n");
+	uprint(DBG "netif add:\n");
 	netif_set_addr(netif, ipaddr, netmask, gw);
 	
 	return netif;
@@ -621,7 +617,7 @@ void netif_set_addr (struct netif* netif, ip_addr_t* ipaddr, ip_addr_t* netmask,
 	set.gw.addr = gw->addr;
 	wifi_set_ip_info(netif_idx, &set);
 
-	uprint("WRAP: netif_set_addr ");
+	uprint(DBG "netif_set_addr ");
 	stub_display_netif(netif);
 }
 
@@ -633,7 +629,7 @@ void netif_set_addr (struct netif* netif, ip_addr_t* ipaddr, ip_addr_t* netmask,
  */
 void netif_set_default (struct netif* netif)
 {
-	uprint("WRAP: netif_set_default ");
+	uprint(DBG "netif_set_default ");
 	stub_display_netif(netif);
 	netif_default = netif;
 
@@ -650,7 +646,7 @@ void netif_set_default (struct netif* netif)
  */ 
 void netif_set_down (struct netif* netif)
 {
-	uprint("WRAP: netif_set_down  ");
+	uprint(DBG "netif_set_down  ");
 	stub_display_netif(netif);
 	
 	netif->flags &= ~NETIF_FLAG_UP;
@@ -668,7 +664,7 @@ void netif_set_down (struct netif* netif)
  */ 
 void netif_set_up (struct netif* netif)
 {
-	uprint("WRAP: netif_set_up ");
+	uprint(DBG "netif_set_up ");
 	stub_display_netif(netif);
 
 	netif->flags |= NETIF_FLAG_UP;
@@ -733,7 +729,7 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 		p->eb = NULL;
 		p->ref = 1;
 		p->flags = 0;
-		uprint("WRAP: pbuf_alloc-> %p %dB type=%d\n", p, alloclen, type);
+		uprint(DBG "pbuf_alloc-> %p %dB type=%d\n", p, alloclen, type);
 		return p;
 	}
 	
@@ -751,11 +747,11 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 		p->eb = NULL;
 		p->ref = 1;
 		p->flags = 0;
-		uprint("WRAP: pbuf_alloc-> %p %dB type=%d\n", p, alloclen, type);
+		uprint(DBG "pbuf_alloc-> %p %dB type=%d\n", p, alloclen, type);
 		return p;
 	}
 
-	uerror("WRAP: pbuf_alloc BAD CASE\n");
+	uerror(DBG "pbuf_alloc BAD CASE\n");
 		
 	return NULL;
 }
@@ -797,41 +793,33 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 u8_t pbuf_free (struct pbuf *p)
 {
 	//STUB(pbuf_free);
-	uprint("WRAP: pbuf_free(%p) ref=%d type=%d\n", p, p->ref, p->type);
+	uprint(DBG "pbuf_free(%p) ref=%d type=%d\n", p, p->ref, p->type);
 //	pbuf_info("pbuf_free", -1, p->len, p->type);
 //	uprint("pbuf@%p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
 	
 	#if LWIP_SUPPORT_CUSTOM_PBUF
 	#error LWIP_SUPPORT_CUSTOM_PBUF is defined
 	#endif
-
+	
 	if (p->type == PBUF_CUSTOM_TYPE_POOLED)
 	{
-		u8_t ret = 0;
-		const long offset = (char*)&pbuf_wrappers[0].pbuf - (char*)&pbuf_wrappers[0];
-		// we have a pbuf chain encapsulated in pbuf_wrapper to remove
-		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)((char*)p - offset);
-		// pw->ref2save is the lwip2 pbuf head to release, the current lwip1 pbuf->payload point inside its chain
-		void* ref2save = pw->ref2save;
-		struct pbuf* q = p;
-		while (q)
-		{
-			uassert(q->ref == 1);
-			pw->used = 0; // release our trivial pool
-			q = q->next;
-			pw = (struct pbuf_wrapper*)((char*)q - offset);
-			ret++;
-		}
-		
-		uprint("WRAP: pbuf_free chain release lwip2-pbuf %p lwip1-pbuf %p\n", ref2save, (char*)p);
-		if (ref2save)
-			esp2glue_pbuf_freed(ref2save);
+		uassert(p->ref == 1);
+
+		// retrieve glue structure to be freed
+		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)p;
+		// pw->ref2save is the glue structure to release
+		uprint(DBG "pbuf_free chain release glue-pbuf %p lwip1-pbuf %p\n", pw->ref2save, (char*)p);
+		uassert(pw->ref2save);
+		esp2glue_pbuf_freed(pw->ref2save);
+		pbuf_wrapper_release(pw);
 			
-		return ret;
+		return 1;
 	}
 		
 	if (!p->next && p->ref == 1)
 	{
+		uassert(p->ref == 1);
+		
 		if (p->eb)
 			system_pp_recycle_rx_pkt(p->eb);
 		if (p->type == PBUF_RAM || p->type == PBUF_REF || p->type == PBUF_ESF_RX)
@@ -853,7 +841,7 @@ u8_t pbuf_free (struct pbuf *p)
  */
 void pbuf_ref (struct pbuf *p)
 {
-	uprint("WRAP: pbuf_ref(%p) ref=%d->%d\n", p, p->ref, p->ref + 1);
+	uprint(DBG "pbuf_ref(%p) ref=%d->%d\n", p, p->ref, p->ref + 1);
 	++(p->ref);
 }
 

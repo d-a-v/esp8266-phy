@@ -66,8 +66,6 @@ void		esp2glue_alloc_for_recv	(size_t len, void** glue_pbuf, void** glue_data);
 void		esp2glue_pbuf_freed	(void* ref_saved);
 
 void		glue2esp_ifup		(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw);
-
-err_glue_t	glue2esp_reserve_pbuf_chain (void** vfirst, void** vlast, void* ref2save, void* data, size_t tot_len, size_t len);
-err_glue_t	glue2esp_linkoutput	(void* vfirst, int netif_idx);
+err_glue_t	glue2esp_linkoutput	(int netif_idx, void* ref2save, void* data, size_t size);
 
 #endif // GLUE_STUB_H
