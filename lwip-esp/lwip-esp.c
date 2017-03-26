@@ -189,7 +189,7 @@ void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type
 // quick pool to store references to data sent
 
 #define PBUF_CUSTOM_TYPE_POOLED 0x42 // must not conflict with PBUF_* (pbuf types)
-#define PBUF_WRAPPER_BLOCK 8
+#define PBUF_WRAPPER_BLOCK 32
 
 struct pbuf_wrapper
 {
@@ -199,41 +199,56 @@ struct pbuf_wrapper
 };
 
 struct pbuf_wrapper* pbuf_wrapper_head = NULL;	// first free
-
-static void pbuf_wrappers_init (void)
-{
-	struct pbuf_wrapper* p = (struct pbuf_wrapper*)os_malloc(sizeof(struct pbuf_wrapper) * PBUF_WRAPPER_BLOCK);
-	if (!p)
-		return;
-	for (int i = 0; i < PBUF_WRAPPER_BLOCK; i++)
-	{
-		p->pbuf.type = PBUF_CUSTOM_TYPE_POOLED;	// constant
-		p->pbuf.flags = 0;			// constant
-		p->pbuf.next = NULL;			// constant
-		p->pbuf.eb = NULL;			// constant
-		p->next = i? p - 1: NULL;
-		p++;
-	}
-	pbuf_wrapper_head = p - 1;
-	uprint(DBG "allocating %d more linkoutput-ref-pbuf\n", PBUF_WRAPPER_BLOCK);
-}
-
+static int xxx = 0;
 struct pbuf_wrapper* pbuf_wrapper_get (void)
 {
+	os_intr_lock();
+
 	if (!pbuf_wrapper_head)
-		pbuf_wrappers_init();
-	if (!pbuf_wrapper_head)
-		return NULL;
+	{
+uerror("ALLOC %d->",xxx);
+		struct pbuf_wrapper* p = (struct pbuf_wrapper*)os_malloc(sizeof(struct pbuf_wrapper) * PBUF_WRAPPER_BLOCK);
+		if (!p)
+		{
+			os_intr_unlock();
+			return NULL;
+		}
+xxx += PBUF_WRAPPER_BLOCK;
+uerror("%d\n",xxx);
+		for (int i = 0; i < PBUF_WRAPPER_BLOCK; i++)
+		{
+			p->pbuf.type = PBUF_CUSTOM_TYPE_POOLED;	// constant
+			p->pbuf.flags = 0;			// constant
+			p->pbuf.next = NULL;			// constant
+			p->pbuf.eb = NULL;			// constant
+			p->next = i? p - 1: NULL;
+			p++;
+		}
+		pbuf_wrapper_head = p - 1;
+	}
+int yyy = 0;
+for (struct pbuf_wrapper* p = pbuf_wrapper_head; p; p = p->next) { yyy++; uassert(p->pbuf.type == PBUF_CUSTOM_TYPE_POOLED); }
+uassert(yyy == xxx);	
 	struct pbuf_wrapper* ret = pbuf_wrapper_head;
 	pbuf_wrapper_head = pbuf_wrapper_head->next;
+xxx--;
+
+	os_intr_unlock();
+
+static long blob = 0; if (millis() - blob > 1000) { uerror("(%d)", xxx); blob += 1000; }
+
 	return ret;
 }
 
 static void pbuf_wrapper_release (struct pbuf_wrapper* p)
 {
 	// make it the new head in the chain of unused
+	os_intr_lock();
+
 	p->next = pbuf_wrapper_head;
 	pbuf_wrapper_head = p;
+xxx++;
+	os_intr_unlock();
 }
 
 // output real packet here:
@@ -248,6 +263,10 @@ err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, void* data, size_
 	p->pbuf.payload = data;
 	p->pbuf.len = p->pbuf.tot_len = size;
 	p->pbuf.ref = 0;
+p->pbuf.type = PBUF_CUSTOM_TYPE_POOLED;
+p->pbuf.flags = 0;
+p->pbuf.next = NULL;
+p->pbuf.eb = NULL;
 	p->ref2save = ref2save;
 	
 	uprint(DBG "LINKOUTPUT: real pbuf sent to wilderness (len=%dB esp-pbuf=%p glue-pbuf=%p netifidx=%d)\n",
@@ -260,7 +279,14 @@ err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, void* data, size_
 	// blobs will call pbuf_free() back later
 	// we will retreive our ref2save and give it back to glue
 	struct netif* netif = netif_esp[netif_idx];
-	return esp2glue_err(netif->linkoutput(netif, &p->pbuf));
+
+	err_t err = netif->linkoutput(netif, &p->pbuf);
+
+	if (err != ERR_OK)
+		// blob/phy is exhausted, release memory
+		pbuf_wrapper_release(p);
+
+	return esp2glue_err(err);
 }
 
 void blobs_getinfo (void)
@@ -310,8 +336,6 @@ static int esp_netif_update (struct netif* netif)
 void lwip_init_RENAMED (void); //XXX should use esp2glue_lwip_init()
 void lwip_init (void)
 {
-	pbuf_wrappers_init();
-	
 	blobs_getinfo();
 	
 	esp2glue_lwip_init();
@@ -896,4 +920,20 @@ void glue2esp_ifup (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw)
 
 	// tell esp to check it has changed (by giving old ones)
 	system_station_got_ip_set(&oldip, &oldmask, &oldgw);
+}
+
+
+void test1 (void)
+{
+uerror("tutu");
+}
+
+void __attribute__((section(".irom0.text"))) test2 (void)
+{
+uerror("toto");
+}
+
+void test3 (void)
+{
+uerror("titi");
 }
