@@ -11,6 +11,8 @@
 #include "glue.h"
 #include "lwip-helper.h"
 
+#define DBG "GLUE: "
+
 static char hostname_sta[32];
 
 #define netif_sta (&netif_git[STATION_IF])
@@ -155,16 +157,16 @@ int lwiperr_check (const char* what, err_t err)
 
 err_glue_t esp2glue_dhcp_start ()
 {
-	uprint("GLUE: dhcp_start netif: ");
+	uprint(DBG "dhcp_start netif: ");
 	new_display_netif(netif_sta);
 	err_t err = dhcp_start(netif_sta);
-	uprint("GLUE: new_dhcp_start returns %d\n", err);
+	uprint(DBG "new_dhcp_start returns %d\n", err);
 	return new2glue_err(err);
 }
 
 void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
 {
-	uprint("GLUE: %d ntp-server known\n", number);
+	uprint(DBG "%d ntp-server known\n", number);
 	if (ntp_servers)
 		mem_free(ntp_servers);
 	if (!number)
@@ -194,6 +196,8 @@ void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
 
 err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 {
+	uprint(DBG "linkoutput: net@f@%p\n", netif);
+
 	#if !LWIP_NETIF_TX_SINGLE_PBUF
 	#warning ESP netif->linkoutput cannot handle pbuf chains.
 	#error LWIP_NETIF_TX_SINGLE_PBUF must be 1 in lwipopts.h
@@ -211,7 +215,7 @@ err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 	if (err != ERR_OK)
 	{
 		pbuf_free(p);
-		uprint("GLUE: linkoutput error sending pbuf@%p\n", p);
+		uprint(DBG "linkoutput error sending pbuf@%p\n", p);
 	}
 
 	return err;
@@ -219,7 +223,7 @@ err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 
 void esp2glue_pbuf_freed (void* pbuf)
 {
-	uprint("GLUE: blobs release lwip-pbuf (ref=%d) @%p\n", ((struct pbuf*)pbuf)->ref, pbuf);
+	uprint(DBG "blobs release lwip-pbuf (ref=%d) @%p\n", ((struct pbuf*)pbuf)->ref, pbuf);
 	pbuf_free((struct pbuf*)pbuf);
 }
 
@@ -231,9 +235,21 @@ static err_t new_input (struct pbuf *p, struct netif *inp)
 	return ERR_ABRT;
 }
 
+void esp2glue_netif_set_default (int netif_idx)
+{
+	uprint(DBG "netif set default %s\n", netif_name[netif_idx]);
+	if (!netif_git_initialized[netif_idx])
+	{
+		uerror(DBG "NOT INITIALIZED YET\n");
+		return;
+	}
+	
+	netif_set_default(&netif_git[netif_idx]);
+}
+
 static void netif_status_callback (struct netif* netif)
 {
-	uprint("GLUE: netif status callback ");
+	uprint(DBG "netif status callback ");
 	new_display_netif(netif);
 	
 	if (netif->flags & NETIF_FLAG_LINK_UP)
@@ -254,7 +270,10 @@ static void setup_netif (int netif_idx)
 	netif_git_initialized[netif_idx] = 1;
 	struct netif* netif = &netif_git[netif_idx];
 
+uprint(GLUE "setup_netif(%d)\", netf_idx;
+
 	#if !LWIP_SINGLE_NETIF
+	// ok
 	netif->next = NULL;
 	#endif
 
@@ -433,7 +452,7 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 			hostname_sta[0] = 0;
 	}
 	
-	uprint("GLUE: netif updated: ");
+	uprint(DBG "netif updated: ");
 	new_display_netif(netif);
 }
 
@@ -448,7 +467,7 @@ err_glue_t esp2glue_ethernet_input (int netif_idx, void* received)
 {
 	// this input is allocated by esp2glue_alloc_for_recv()
 
-	//uprint("GLUE: input idx=%d netif-flags=0x%x ", netif_idx, netif_git[netif_idx].flags);
+	//uprint(DBG "input idx=%d netif-flags=0x%x ", netif_idx, netif_git[netif_idx].flags);
 	//display_ip32(" ip=", netif_git[netif_idx].ip_addr.addr);
 	//nl();
 	

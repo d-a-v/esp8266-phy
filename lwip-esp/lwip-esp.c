@@ -9,7 +9,7 @@
 
 #include "glue.h"
 
-#define DBG	"LWESP: "
+#define DBG	"lwESP: "
 #define STUB(x) do { uerror("STUB: " #x "\n"); } while (0)
 
 // guessed interface, esp blobs
@@ -189,7 +189,7 @@ void pbuf_info (const char* what, pbuf_layer layer, u16_t length, pbuf_type type
 // quick pool to store references to data sent
 
 #define PBUF_CUSTOM_TYPE_POOLED 0x42 // must not conflict with PBUF_* (pbuf types)
-#define PBUF_WRAPPER_BLOCK 32
+#define PBUF_WRAPPER_BLOCK 8
 
 struct pbuf_wrapper
 {
@@ -199,22 +199,19 @@ struct pbuf_wrapper
 };
 
 struct pbuf_wrapper* pbuf_wrapper_head = NULL;	// first free
-static int xxx = 0;
+
 struct pbuf_wrapper* pbuf_wrapper_get (void)
 {
 	os_intr_lock();
 
 	if (!pbuf_wrapper_head)
 	{
-uerror("ALLOC %d->",xxx);
 		struct pbuf_wrapper* p = (struct pbuf_wrapper*)os_malloc(sizeof(struct pbuf_wrapper) * PBUF_WRAPPER_BLOCK);
 		if (!p)
 		{
 			os_intr_unlock();
 			return NULL;
 		}
-xxx += PBUF_WRAPPER_BLOCK;
-uerror("%d\n",xxx);
 		for (int i = 0; i < PBUF_WRAPPER_BLOCK; i++)
 		{
 			p->pbuf.type = PBUF_CUSTOM_TYPE_POOLED;	// constant
@@ -226,16 +223,10 @@ uerror("%d\n",xxx);
 		}
 		pbuf_wrapper_head = p - 1;
 	}
-int yyy = 0;
-for (struct pbuf_wrapper* p = pbuf_wrapper_head; p; p = p->next) { yyy++; uassert(p->pbuf.type == PBUF_CUSTOM_TYPE_POOLED); }
-uassert(yyy == xxx);	
 	struct pbuf_wrapper* ret = pbuf_wrapper_head;
 	pbuf_wrapper_head = pbuf_wrapper_head->next;
-xxx--;
 
 	os_intr_unlock();
-
-static long blob = 0; if (millis() - blob > 1000) { uerror("(%d)", xxx); blob += 1000; }
 
 	return ret;
 }
@@ -247,28 +238,26 @@ static void pbuf_wrapper_release (struct pbuf_wrapper* p)
 
 	p->next = pbuf_wrapper_head;
 	pbuf_wrapper_head = p;
-xxx++;
+
 	os_intr_unlock();
 }
 
-// output real packet here:
 err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, void* data, size_t size)
 {
 	struct pbuf_wrapper* p = pbuf_wrapper_get();
 	if (!p)
 		return GLUE_ERR_MEM;
 
+	uassert(p->pbuf.type == PBUF_CUSTOM_TYPE_POOLED);
+	uassert(p->pbuf.flags == 0);
+	uassert(p->pbuf.next == NULL);
 	uassert(p->pbuf.eb == NULL);
-
+	
 	p->pbuf.payload = data;
 	p->pbuf.len = p->pbuf.tot_len = size;
 	p->pbuf.ref = 0;
-p->pbuf.type = PBUF_CUSTOM_TYPE_POOLED;
-p->pbuf.flags = 0;
-p->pbuf.next = NULL;
-p->pbuf.eb = NULL;
 	p->ref2save = ref2save;
-	
+
 	uprint(DBG "LINKOUTPUT: real pbuf sent to wilderness (len=%dB esp-pbuf=%p glue-pbuf=%p netifidx=%d)\n",
 		p->pbuf.len,
 		&p->pbuf,
@@ -277,15 +266,13 @@ p->pbuf.eb = NULL;
 	
 	// call blobs
 	// blobs will call pbuf_free() back later
-	// we will retreive our ref2save and give it back to glue
+	// we will retrieve our ref2save and give it back to glue
+
 	struct netif* netif = netif_esp[netif_idx];
-
 	err_t err = netif->linkoutput(netif, &p->pbuf);
-
 	if (err != ERR_OK)
 		// blob/phy is exhausted, release memory
 		pbuf_wrapper_release(p);
-
 	return esp2glue_err(err);
 }
 
@@ -293,9 +280,22 @@ void blobs_getinfo (void)
 {
 	struct netif* test_netif_sta = eagle_lwip_getif(STATION_IF);
 	struct netif* test_netif_ap = eagle_lwip_getif(SOFTAP_IF);
+
+	if (test_netif_sta)
+	{
+		uassert(!netif_sta || test_netif_sta == netif_sta);
+		uassert(test_netif_sta->input == ethernet_input);
+		uassert(test_netif_sta->output == etharp_output);
+	}
+	else uprint(DBG "sta not initialized\n");
 	
-	uassert(!netif_sta || test_netif_sta == netif_sta);
-	uassert(!netif_ap || test_netif_ap == netif_ap);
+	if (test_netif_ap)
+	{
+		uassert(!netif_ap || test_netif_ap == netif_ap);
+		uassert(test_netif_ap->input == ethernet_input);
+		uassert(test_netif_ap->output == etharp_output);
+	}
+	else uprint(DBG "ap not initialized\n");
 	
 	netif_sta = test_netif_sta;
 	netif_ap = test_netif_ap;
@@ -306,16 +306,7 @@ static int esp_netif_update (struct netif* netif)
 {
 	blobs_getinfo();
 
-	uassert(netif->input == ethernet_input);
-	uassert(netif->output == etharp_output);
-
-	int netif_idx;
-	if (netif == netif_sta)
-		netif_idx = STATION_IF;
-	else if (netif == netif_ap)
-		netif_idx = SOFTAP_IF;
-	else
-		return -1;
+	int netif_idx = (netif == netif_sta)? STATION_IF: SOFTAP_IF;
 
 	esp2glue_netif_updated(
 		netif_idx,
@@ -340,7 +331,7 @@ void lwip_init (void)
 	
 	esp2glue_lwip_init();
 	
-	uprint("WRAP lwip_init\n");
+	uprint(DBG "lwip_init\n");
 }
 
 /**
@@ -364,7 +355,6 @@ void lwip_init (void)
 err_t etharp_output (struct netif* netif, struct pbuf* q, ip_addr_t* ipaddr)
 {
 	(void)netif; (void)q; (void)ipaddr;
-	//STUB(etharp_output);
 	uerror("ERROR: STUB etharp_output should not be called\n");
 	return ERR_ABRT;
 }
@@ -377,6 +367,9 @@ err_t etharp_output (struct netif* netif, struct pbuf* q, ip_addr_t* ipaddr)
  * @param p the recevied packet, p->payload pointing to the ethernet header
  * @param netif the network interface on which the packet was received
  */
+// this is called maybe through netif->input()
+// maybe we could try to short-circuit netif->input
+// but so far ethernet_input() is fine with AP and STA
 err_t ethernet_input (struct pbuf* p, struct netif* netif)
 {
 	uprint(DBG "received (pbuf: %dB ref=%d eb=%p) on netif ", p->tot_len, p->ref, p->eb);
@@ -387,6 +380,7 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 	uassert(p->tot_len == p->len && p->ref == 1);
 	
 #if UDEBUG
+	// dump packets for me (direct or broadcast)
 	if (   memcmp((const char*)p->payload, netif->hwaddr, 6) == 0
 	    || memcmp((const char*)p->payload, ethbroadcast.addr, 6) == 0)
 	{
@@ -411,6 +405,7 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 	pbuf_free(p);
 
 	if (!glue_pbuf)
+		// packet lost
 		return ERR_MEM;
 
 	// pass to new ip stack
@@ -422,7 +417,7 @@ void dhcps_start (struct ip_info* info)
 	// at that point, assume that serial port is open for printing debug output
 	doprint_allow = 1;
 
-	uprint("WRAP dhcps_start ");
+	uprint(DBG "dhcps_start ");
 	display_ip_info(info);
 	uprint("\n");
 	
@@ -439,16 +434,13 @@ void dhcps_start (struct ip_info* info)
 void dhcps_stop (void)
 {
 	// not implemented yet
-	
 	STUB(dhcps_stop);
 }
 
 void espconn_init (void)
 {
 	// not implemented yet
-	
 	STUB(espconn_init);
-
 	blobs_getinfo();
 }
 
@@ -456,18 +448,14 @@ void dhcp_cleanup (struct netif* netif)
 {
 	// not implemented yet
 	(void)netif;
-	
 	STUB(dhcp_cleanup);
-	stub_display_netif(netif);
 }
 
 err_t dhcp_release (struct netif* netif)
 {
 	// not implemented yet
 	(void)netif;
-	
 	STUB(dhcp_release);
-	stub_display_netif(netif);
 	return ERR_ABRT;
 }
 
@@ -500,10 +488,8 @@ err_t dhcp_start (struct netif* netif)
 void dhcp_stop (struct netif* netif)
 {
 	(void)netif;
-	
 	// not implemented yet
 	STUB(dhcp_stop);
-	stub_display_netif(netif);
 }
 
 /**
@@ -521,7 +507,14 @@ void dhcp_stop (struct netif* netif)
  * @return netif, or NULL if failed.
  */
  
-struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netmask, ip_addr_t *gw, void *state, netif_init_fn init, netif_input_fn packet_incoming)
+struct netif* netif_add (
+	struct netif* netif,
+	ip_addr_t* ipaddr,
+	ip_addr_t* netmask,
+	ip_addr_t* gw,
+	void* state,
+	netif_init_fn init,
+	netif_input_fn packet_incoming)
 {
 	// netif->output is "packet_ougtoing" already initialized
 	// packet_incoming is given for us to put in *netif
@@ -569,8 +562,16 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 		netif->loop_last = NULL;
 		#endif /* ENABLE_LOOPBACK */
 	netif->state = state;
-	netif->num = 1;//netifnum++;
-	netif->input = packet_incoming; // = (old above)ethernet_input(never called)
+
+	static int netifnum = 0;
+	netif->num = netifnum++;
+
+#if 0
+	netif->input = ethernet_input;
+#else
+	netif->input = packet_incoming; // inside blobs
+#endif
+
 		#if LWIP_NETIF_HWADDRHINT
 		#error
 		netif->addr_hint = NULL;
@@ -580,14 +581,17 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 		netif->loop_cnt_current = 0;
 		#endif /* ENABLE_LOOPBACK && LWIP_LOOPBACK_MAX_PBUFS */
 
-	//XXX fixme init() is from blobs to call blobs, unknown yet
+	//XXX init() is from blobs to call blobs, unknown effect yet
 	if (init(netif) != ERR_OK)
 	{
 		uprint("ERROR netif_add: caller's init() failed\n");
 		return NULL;
 	}
-	netif->next = NULL; //netif_list;
-	//netif_list = netif;
+
+	static struct netif* netif_list = NULL;
+	netif->next = netif_list;
+	netif_list = netif;
+	
 //XXX	snmp_inc_iflist();
 	#if LWIP_IGMP
 	// ok
@@ -611,9 +615,7 @@ struct netif* netif_add (struct netif *netif, ip_addr_t *ipaddr, ip_addr_t *netm
 void netif_remove (struct netif *netif)
 {
 	(void)netif;
-	
-	uprint("STUB netif_remove ");
-	stub_display_netif(netif);
+	STUB(netif_remove);
 }
 
 /**
@@ -658,6 +660,8 @@ void netif_set_default (struct netif* netif)
 	netif_default = netif;
 
 	esp_netif_update(netif);
+	
+	esp2glue_netif_set_default(netif == netif_sta? STATION_IF: SOFTAP_IF);
 }
 
 /**
@@ -733,7 +737,7 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 	// copy parts of original code matching specific requests
 
 	//STUB(pbuf_alloc);
-//	pbuf_info("pbuf_alloc", layer, length, type);
+	//pbuf_info("pbuf_alloc", layer, length, type);
 	
 	u16_t offset = 0;
 	if (layer == PBUF_RAW && type == PBUF_RAM)
@@ -818,16 +822,20 @@ u8_t pbuf_free (struct pbuf *p)
 {
 	//STUB(pbuf_free);
 	uprint(DBG "pbuf_free(%p) ref=%d type=%d\n", p, p->ref, p->type);
-//	pbuf_info("pbuf_free", -1, p->len, p->type);
-//	uprint("pbuf@%p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
+	//pbuf_info("pbuf_free", -1, p->len, p->type);
+	//uprint("pbuf@%p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
 	
 	#if LWIP_SUPPORT_CUSTOM_PBUF
 	#error LWIP_SUPPORT_CUSTOM_PBUF is defined
 	#endif
 	
+	uassert(p->ref == 1);
+	if (p->eb)
+		system_pp_recycle_rx_pkt(p->eb);
+
 	if (p->type == PBUF_CUSTOM_TYPE_POOLED)
 	{
-		uassert(p->ref == 1);
+		// allocated by glue for sending packets
 
 		// retrieve glue structure to be freed
 		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)p;
@@ -840,17 +848,17 @@ u8_t pbuf_free (struct pbuf *p)
 		return 1;
 	}
 		
-	if (!p->next && p->ref == 1)
+	if (   !p->next
+	    && p->ref == 1
+	    && (
+		   p->type == PBUF_RAM
+		|| p->type == PBUF_REF
+	      //|| p->type == PBUF_ESF_RX
+	       ))
 	{
-		uassert(p->ref == 1);
-		
-		if (p->eb)
-			system_pp_recycle_rx_pkt(p->eb);
-		if (p->type == PBUF_RAM || p->type == PBUF_REF || p->type == PBUF_ESF_RX)
-		{
-			mem_free(p);
-			return 1;
-		}
+		// allocated by blobs for received packets
+		mem_free(p);
+		return 1;
 	}
 
 	uerror("BAD CASE %p ref=%d tot_len=%d eb=%p\n", p, p->ref, p->tot_len, p->eb);
@@ -897,7 +905,7 @@ void sys_timeout(u32_t msecs, sys_timeout_handler handler, void *arg)
 */
 void sys_untimeout(sys_timeout_handler handler, void *arg)
 {
-(void)handler; (void)arg;
+	(void)handler; (void)arg;
 	STUB(sys_untimeout);
 }
 
@@ -920,20 +928,4 @@ void glue2esp_ifup (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw)
 
 	// tell esp to check it has changed (by giving old ones)
 	system_station_got_ip_set(&oldip, &oldmask, &oldgw);
-}
-
-
-void test1 (void)
-{
-uerror("tutu");
-}
-
-void __attribute__((section(".irom0.text"))) test2 (void)
-{
-uerror("toto");
-}
-
-void test3 (void)
-{
-uerror("titi");
 }
