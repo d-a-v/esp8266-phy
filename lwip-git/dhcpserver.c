@@ -757,6 +757,7 @@ void ICACHE_FLASH_ATTR dhcps_start(struct ip_info *info)
 #endif
 
     wifi_set_ip_info(SOFTAP_IF, info); // added for lwip-git, not sure whether useful
+    netif_ap->flags |= NETIF_FLAG_UP | NETIF_FLAG_LINK_UP; // added for lwip-git
     netif_set_default(netif_ap);
 }
 

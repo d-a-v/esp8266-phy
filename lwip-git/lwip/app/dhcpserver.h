@@ -1,6 +1,8 @@
 #ifndef __DHCPS_H__
 #define __DHCPS_H__
 
+#include "glue.h" // for UDEBUG
+
 #define USE_DNS
 
 typedef struct dhcps_state{
@@ -95,7 +97,7 @@ extern uint32 dhcps_lease_time;
 #define DHCP_OPTION_END         255
 
 //#define USE_CLASS_B_NET 1
-#define DHCPS_DEBUG          0
+#define DHCPS_DEBUG          UDEBUG
 #define MAX_STATION_NUM      8
 
 #define DHCPS_STATE_OFFER 1

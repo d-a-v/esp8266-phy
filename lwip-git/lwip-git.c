@@ -123,8 +123,9 @@ static const char* new_netif_name (struct netif* netif)
 static void new_display_netif (struct netif* netif)
 {
 	
-	uprint("lwip-@%p %s name=%c%c%d mtu=%d state=%p ",
+	uprint("lwip-@%p idx=%d %s name=%c%c%d mtu=%d state=%p ",
 		netif,
+		netif == netif_ap? SOFTAP_IF: STATION_IF,
 		new_netif_name(netif),
 		netif->name[0], netif->name[1], netif->num,
 		netif->mtu,
@@ -196,7 +197,6 @@ void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
 
 err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 {
-	uprint(DBG "linkoutput: net@f@%p\n", netif);
 
 	#if !LWIP_NETIF_TX_SINGLE_PBUF
 	#warning ESP netif->linkoutput cannot handle pbuf chains.
@@ -208,8 +208,12 @@ err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 	// protect pbuf, so lwip2 won't free it before phy finishes sending
 	pbuf_ref(p);
 
+	int netif_idx = netif == netif_sta? STATION_IF: SOFTAP_IF;
+
+	uprint(DBG "linkoutput: netif@%p (%s)\n", netif, netif_name[netif_idx]);
+
 	err_t err = glue2git_err(glue2esp_linkoutput(
-		netif == netif_sta? STATION_IF: SOFTAP_IF,
+		netif_idx,
 		p, p->payload, p->len));
 
 	if (err != ERR_OK)
@@ -265,17 +269,19 @@ static void netif_status_callback (struct netif* netif)
 
 static void setup_netif (int netif_idx)
 {
-	if (netif_git_initialized[netif_idx])
-		return;
-	netif_git_initialized[netif_idx] = 1;
 	struct netif* netif = &netif_git[netif_idx];
 
-uprint(GLUE "setup_netif(%d)\", netf_idx;
+uprint(DBG "pre-setup_netif(%d = %s)\n", netif_idx, netif_name[netif_idx]);
 
-	#if !LWIP_SINGLE_NETIF
-	// ok
-	netif->next = NULL;
+	#if LWIP_SINGLE_NETIF
+	#error we have two netif
 	#endif
+
+	// this will be overwritten by lwip's netif_add()
+	netif_git[0].next = &netif_git[1];
+	netif_git[1].next = NULL;
+	netif_git[0].num = 0;
+	netif_git[1].num = 1;
 
 	#if LWIP_IPV4
 	/** IP address configuration in network byte order */
@@ -297,8 +303,10 @@ uprint(GLUE "setup_netif(%d)\", netf_idx;
 		#endif /* LWIP_IPV6_ADDRESS_LIFETIMES */
 		#endif /* LWIP_IPV6 */
 
+	// irrelevant,not used since esp-lwip receive data and call esp2glue_ethernet_input()
 	netif->input = new_input;
-	netif->output = etharp_output; //new_ipv4output;
+	// meaningfull:
+	netif->output = etharp_output;
 	netif->linkoutput = new_linkoutput;
 
 		#if LWIP_IPV6
@@ -354,7 +362,6 @@ uprint(GLUE "setup_netif(%d)\", netf_idx;
 	
 	/** number of this interface. Used for @ref if_api and @ref netifapi_netif,
 	* as well as for IPv6 zones */
-	netif->num = 0;
 
 		#if LWIP_IPV6_AUTOCONFIG
 		#error
@@ -409,12 +416,33 @@ uprint(GLUE "setup_netif(%d)\", netf_idx;
 		#endif /* ENABLE_LOOPBACK */
 };
 
+err_t emptinit (struct netif* netif)
+{
+//XXX do the work of our setup_netif() above
+//XXX very much like netif_loopif_init() in netif.c
+//XXX this will make things cleaner
+
+	// was overwritten
+	netif->status_callback = netif_status_callback;
+	//XXX finish work here	
+	
+	return ERR_OK;
+}
+
 void esp2glue_lwip_init (void)
 {
+	lwip_init();
+
+	// fill output, linkoutput, name
+	// all others shall be overwritten by netif_add below
 	memset(&netif_git[0], 0, sizeof(netif_git[0]));
 	memset(&netif_git[1], 0, sizeof(netif_git[1]));
-
-	lwip_init();
+	setup_netif(STATION_IF);
+	setup_netif(SOFTAP_IF);
+	
+	ip4_addr_t zero = { 0 };
+	netif_add(&netif_git[STATION_IF], &zero, &zero, &zero, /*state*/NULL, emptinit, /*useless input*/NULL);
+	netif_add(&netif_git[SOFTAP_IF],  &zero, &zero, &zero, /*state*/NULL, emptinit, /*useless input*/NULL);
 }
 
 void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, glue_netif_flags_t flags, uint32_t hwlen, const uint8_t* hw /*, void* state*/)
@@ -424,8 +452,9 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 
 	struct netif* netif = &netif_git[netif_idx];
 
-	if (!netif_git_initialized[netif_idx])
-		setup_netif(netif_idx);
+	// done in lwip_init
+	//if (!netif_git_initialized[netif_idx])
+	//	setup_netif(netif_idx);
 	
 	if (!netif->ip_addr.addr)
 	{

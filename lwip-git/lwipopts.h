@@ -1427,7 +1427,7 @@
  * small real-life targets. Some code like routing etc. can be left out.
  */
 #if !defined LWIP_SINGLE_NETIF || defined __DOXYGEN__
-#define LWIP_SINGLE_NETIF               1 // 0
+#define LWIP_SINGLE_NETIF               0 // AP+STA = 2 different netif
 #endif
 
 /**
@@ -2722,14 +2722,14 @@
  * ETHARP_DEBUG: Enable debugging in etharp.c.
  */
 #if !defined ETHARP_DEBUG || defined __DOXYGEN__
-#define ETHARP_DEBUG                    LWIP_DBG_OFF//LWIP_DBG_OFF
+#define ETHARP_DEBUG                    LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
 #endif
 
 /**
  * NETIF_DEBUG: Enable debugging in netif.c.
  */
 #if !defined NETIF_DEBUG || defined __DOXYGEN__
-#define NETIF_DEBUG                     LWIP_DBG_OFF//LWIP_DBG_OFF
+#define NETIF_DEBUG                     LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
 #endif
 
 /**
@@ -2785,7 +2785,7 @@
  * IP_DEBUG: Enable debugging for IP.
  */
 #if !defined IP_DEBUG || defined __DOXYGEN__
-#define IP_DEBUG                        LWIP_DBG_OFF//LWIP_DBG_OFF
+#define IP_DEBUG                        LWIP_DBG_TYPES_ON//LWIP_DBG_OFF
 #endif
 
 /**

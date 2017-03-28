@@ -145,8 +145,9 @@ static void stub_display_netif_flags (int flags)
 static void stub_display_netif (struct netif* netif)
 {
 	uassert(netif == netif_sta || netif == netif_ap);
-	uprint("esp-@%p %s name=%c%c%d state=%p ",
+	uprint("esp-@%p idx=%d %s name=%c%c%d state=%p ",
 		netif,
+		netif == netif_ap? SOFTAP_IF: STATION_IF,
 		netif == netif_ap? "AP": "STA",
 		netif->name[0], netif->name[1], netif->num,
 		netif->state);
@@ -244,6 +245,8 @@ static void pbuf_wrapper_release (struct pbuf_wrapper* p)
 
 err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, void* data, size_t size)
 {
+	doprint_allow = 1;
+	
 	struct pbuf_wrapper* p = pbuf_wrapper_get();
 	if (!p)
 		return GLUE_ERR_MEM;
@@ -372,7 +375,9 @@ err_t etharp_output (struct netif* netif, struct pbuf* q, ip_addr_t* ipaddr)
 // but so far ethernet_input() is fine with AP and STA
 err_t ethernet_input (struct pbuf* p, struct netif* netif)
 {
-	uprint(DBG "received (pbuf: %dB ref=%d eb=%p) on netif ", p->tot_len, p->ref, p->eb);
+if (millis() > 2000) doprint_allow = 1;
+
+	uprint(DBG "received pbuf@%p (pbuf: %dB ref=%d eb=%p) on netif ", p, p->tot_len, p->ref, p->eb);
 	stub_display_netif(netif);
 	
 	int netif_idx = esp_netif_update(netif);
@@ -415,7 +420,7 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 void dhcps_start (struct ip_info* info)
 {
 	// at that point, assume that serial port is open for printing debug output
-	doprint_allow = 1;
+//	doprint_allow = 1;
 
 	uprint(DBG "dhcps_start ");
 	display_ip_info(info);
