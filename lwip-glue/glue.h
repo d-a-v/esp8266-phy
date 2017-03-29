@@ -65,6 +65,7 @@ err_glue_t	esp2glue_ethernet_input		(int netif_idx, void* glue_pbuf);
 void		esp2glue_alloc_for_recv		(size_t len, void** glue_pbuf, void** glue_data);
 void		esp2glue_pbuf_freed		(void* ref_saved);
 void		esp2glue_netif_set_default	(int netif_idx);
+void		esp2glue_netif_add		(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw);
 
 void		glue2esp_ifup			(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw);
 err_glue_t	glue2esp_linkoutput		(int netif_idx, void* ref2save, void* data, size_t size);
