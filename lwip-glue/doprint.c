@@ -30,6 +30,8 @@ int doprint (const char* format, ...)
 #define ROTBUFLEN	(1 << (ROTBUFLEN_BIT))
 #define ROTBUFLEN_MASK	((ROTBUFLEN) - 1)
 
+static int nl = 0;
+
 static int rotin = 0;
 static int rotout = 0;
 static int rotsmall = 0;
@@ -46,13 +48,25 @@ static int bufputc (int c)
 	return c;
 }
 
+//#define PUTC ets_putc		// no line number
+#define PUTC nl_putc		// show line number
+
+static int nl_putc (int c);
+
 static int doprint_direct (const char* format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
-	int ret = ets_vprintf(ets_putc, format, ap);
+	int ret = ets_vprintf(PUTC, format, ap);
 	va_end(ap);
 	return ret;
+}
+
+static int nl_putc (int c)
+{
+	ets_putc(c);
+	if (c == '\n')
+		doprint_direct("%d:", nl++);
 }
 
 int doprint (const char* format, ...)
@@ -64,18 +78,18 @@ int doprint (const char* format, ...)
 	{
 		if (rotbuf)
 		{
-			doprint_direct("<buffered:");
+			doprint_direct("\n<buffered:");
 			if (rotsmall)
 				doprint_direct("(%dcharslost):", rotsmall);
-			ets_putc('\n');
+			PUTC('\n');
 			for (; rotin != rotout; ret++, rotin = (rotin + 1) & ROTBUFLEN_MASK)
-				ets_putc(rotbuf[rotin]);
+				PUTC(rotbuf[rotin]);
 			doprint_direct(":dereffub>\n");
 			os_free(rotbuf);
 			rotbuf = NULL;
 		}
 		
-		myputc = ets_putc;
+		myputc = PUTC;
 	}
 	else if (!rotbuf && !(rotbuf = (char*)os_malloc(ROTBUFLEN)))
 		return 0;
