@@ -67,6 +67,7 @@ static int nl_putc (int c)
 	ets_putc(c);
 	if (c == '\n')
 		doprint_direct("%d:", nl++);
+	return c;
 }
 
 int doprint (const char* format, ...)

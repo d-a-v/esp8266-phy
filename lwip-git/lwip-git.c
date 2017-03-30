@@ -13,12 +13,12 @@
 
 #define DBG "GLUE: "
 
-static char hostname_sta[32];
+static char hostname[32];
+static char hostname[32];
 
 #define netif_sta (&netif_git[STATION_IF])
 #define netif_ap  (&netif_git[SOFTAP_IF])
 struct netif netif_git[2];
-int netif_git_initialized[2] = { 0, 0 }; //XXX or char?
 const char netif_name[2][8] = { "station", "soft-ap" };
 
 int ntp_servers_number = 0;
@@ -50,7 +50,7 @@ err_t glue2git_err (err_glue_t err)
 	}
 };	
 
-err_glue_t new2glue_err (err_t err)
+err_glue_t git2glue_err (err_t err)
 {
 	switch (err)
 	{
@@ -162,7 +162,7 @@ err_glue_t esp2glue_dhcp_start ()
 	new_display_netif(netif_sta);
 	err_t err = dhcp_start(netif_sta);
 	uprint(DBG "new_dhcp_start returns %d\n", err);
-	return new2glue_err(err);
+	return git2glue_err(err);
 }
 
 void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
@@ -242,16 +242,10 @@ static err_t new_input (struct pbuf *p, struct netif *inp)
 void esp2glue_netif_set_default (int netif_idx)
 {
 	uprint(DBG "netif set default %s\n", netif_name[netif_idx]);
-	if (!netif_git_initialized[netif_idx])
-	{
-		uerror(DBG "NOT INITIALIZED YET\n");
-		return;
-	}
-	
 	netif_set_default(&netif_git[netif_idx]);
 }
 
-static void netif_status_callback (struct netif* netif)
+static void netif_sta_status_callback (struct netif* netif)
 {
 	uprint(DBG "netif status callback ");
 	new_display_netif(netif);
@@ -267,182 +261,92 @@ static void netif_status_callback (struct netif* netif)
 	}
 }
 
-static void setup_netif (int netif_idx)
+static void netif_init_common (struct netif* netif)
 {
-	struct netif* netif = &netif_git[netif_idx];
-
-uprint(DBG "pre-setup_netif(%d = %s)\n", netif_idx, netif_name[netif_idx]);
-
-	#if LWIP_SINGLE_NETIF
-	#error we have two netif
-	#endif
-
-	// this will be overwritten by lwip's netif_add()
-	netif_git[0].next = &netif_git[1];
-	netif_git[1].next = NULL;
-	netif_git[0].num = 0;
-	netif_git[1].num = 1;
-
-	#if LWIP_IPV4
-	/** IP address configuration in network byte order */
-	netif->ip_addr.addr = 0;
-	netif->netmask.addr = 0;
-	netif->gw.addr = 0;
-	#endif /* LWIP_IPV4 */
-	
-		#if LWIP_IPV6
-		#error
-		//ip_addr_t ip6_addr[LWIP_IPV6_NUM_ADDRESSES];
-		//u8_t ip6_addr_state[LWIP_IPV6_NUM_ADDRESSES];
-		#if LWIP_IPV6_ADDRESS_LIFETIMES
-		/** Remaining valid and preferred lifetime of each IPv6 address, in seconds.
-		   * For valid lifetimes, the special value of IP6_ADDR_LIFE_STATIC (0)
-		   * indicates the address is static and has no lifetimes. */
-		//u32_t ip6_addr_valid_life[LWIP_IPV6_NUM_ADDRESSES];
-		//u32_t ip6_addr_pref_life[LWIP_IPV6_NUM_ADDRESSES];
-		#endif /* LWIP_IPV6_ADDRESS_LIFETIMES */
-		#endif /* LWIP_IPV6 */
-
+	netif->flags |= NETIF_FLAG_IGMP;
 	// irrelevant,not used since esp-lwip receive data and call esp2glue_ethernet_input()
 	netif->input = new_input;
 	// meaningfull:
 	netif->output = etharp_output;
 	netif->linkoutput = new_linkoutput;
-
-		#if LWIP_IPV6
-		#error
-		netif->output_ip6 = blah
-		#endif /* LWIP_IPV6 */
-
-	#if LWIP_NETIF_STATUS_CALLBACK
-	netif->status_callback = netif_status_callback;
-	#endif /* LWIP_NETIF_STATUS_CALLBACK */
-
-		#if LWIP_NETIF_LINK_CALLBACK
-		#error
-		netif->link_callback = blah
-		#endif /* LWIP_NETIF_LINK_CALLBACK */
-
-		#if LWIP_NETIF_REMOVE_CALLBACK
-		#error
-		netif->remove_callback = blah
-		#endif /* LWIP_NETIF_REMOVE_CALLBACK */
 	
-	netif->state = NULL;
-
-	#ifdef netif_get_client_data
-	// defined
-	//XXX what is this
-	//void* client_data[LWIP_NETIF_CLIENT_DATA_INDEX_MAX + LWIP_NUM_NETIF_CLIENT_DATA];
-	#endif
-	
-	#if LWIP_NETIF_HOSTNAME
-	netif->hostname = hostname_sta;
-	#endif /* LWIP_NETIF_HOSTNAME */
-	
+	netif->hostname = hostname;
 	netif->chksum_flags = NETIF_CHECKSUM_ENABLE_ALL;
 	netif->mtu = TCP_MSS + 40;
-	
-	//hwaddr[NETIF_MAX_HWADDR_LEN];
-	netif->hwaddr_len = 0;
+}
 
-	netif->flags = 0;
-
-	/** descriptive abbreviation */
-	if (netif_idx == STATION_IF)
-	{
-		netif->name[0] = 's';
-		netif->name[1] = 't';
-	}
-	else
-	{
-		netif->name[0] = 'a';
-		netif->name[1] = 'p';
-	}
-	
-	/** number of this interface. Used for @ref if_api and @ref netifapi_netif,
-	* as well as for IPv6 zones */
-
-		#if LWIP_IPV6_AUTOCONFIG
-		#error
-		/** is this netif enabled for IPv6 autoconfiguration */
-		u8_t ip6_autoconfig_enabled;
-		#endif /* LWIP_IPV6_AUTOCONFIG */
-		
-		#if LWIP_IPV6_SEND_ROUTER_SOLICIT
-		#error
-		/** Number of Router Solicitation messages that remain to be sent. */
-		u8_t rs_count;
-		#endif /* LWIP_IPV6_SEND_ROUTER_SOLICIT */
-	
-		#if MIB2_STATS
-		#error
-		/** link type (from "snmp_ifType" enum from snmp_mib2.h) */
-		u8_t link_type;
-		/** (estimate) link speed */
-		u32_t link_speed;
-		/** timestamp at last change made (up/down) */
-		u32_t ts;
-		/** counters */
-		struct stats_mib2_netif_ctrs mib2_counters;
-		#endif /* MIB2_STATS */
-
-	#if LWIP_IPV4 && LWIP_IGMP
-	  /** This function could be called to add or delete an entry in the multicast
-	      filter table of the ethernet MAC.*/
-	netif->igmp_mac_filter = NULL;
-	#endif /* LWIP_IPV4 && LWIP_IGMP */
-
-		#if LWIP_IPV6 && LWIP_IPV6_MLD
-		#error
-		  /** This function could be called to add or delete an entry in the IPv6 multicast
-		      filter table of the ethernet MAC. */
-		  netif_mld_mac_filter_fn mld_mac_filter;
-		#endif /* LWIP_IPV6 && LWIP_IPV6_MLD */
-
-		#if LWIP_NETIF_HWADDRHINT
-		#error
-		  u8_t *addr_hint;
-		#endif /* LWIP_NETIF_HWADDRHINT */
-
-		#if ENABLE_LOOPBACK
-		#error
-		  /* List of packets to be queued for ourselves. */
-		  struct pbuf *loop_first;
-		  struct pbuf *loop_last;
-		#if LWIP_LOOPBACK_MAX_PBUFS
-		  u16_t loop_cnt_current;
-		#endif /* LWIP_LOOPBACK_MAX_PBUFS */
-		#endif /* ENABLE_LOOPBACK */
-};
-
-err_t emptinit (struct netif* netif)
+static err_t netif_init_sta (struct netif* netif)
 {
-//XXX do the work of our setup_netif() above
-//XXX very much like netif_loopif_init() in netif.c
-//XXX this will make things cleaner
-
-	// was overwritten
-	netif->status_callback = netif_status_callback;
-	//XXX finish work here	
+	uprint(DBG "netif_sta_init\n");
+	
+	netif->name[0] = 's';
+	netif->name[1] = 't';
+	netif->status_callback = netif_sta_status_callback; // need to tell esp-netif-sta is up
+	
+	netif_init_common(netif);
 	
 	return ERR_OK;
+}
+
+static err_t netif_init_ap (struct netif* netif)
+{
+	uprint(DBG "netif_ap_init\n");
+
+	netif->name[0] = 'a';
+	netif->name[1] = 'p';
+	netif->status_callback = NULL; // esp-netif-ap is made up by esp
+	
+	netif_init_common(netif);
+
+	return ERR_OK;
+}
+
+void esp2glue_netif_add (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, size_t hwlen, const uint8_t* hwaddr)
+{
+	static int check_idx = 0;
+	uassert(netif_idx == check_idx);
+	check_idx++;
+	
+	struct netif* netif = &netif_git[netif_idx];
+	netif->hwaddr_len = hwlen;
+	if (hwlen && hwlen <= sizeof(netif->hwaddr))
+		memcpy(netif->hwaddr, hwaddr, netif->hwaddr_len = hwlen);
+
+	ip4_addr_t aip = { ip }, amask = { mask }, agw = { gw };
+	netif_add(
+		&netif_git[netif_idx],
+		&aip, &amask, &agw, /*state*/NULL,
+		netif_idx == STATION_IF? netif_init_sta: netif_init_ap,
+		/*useless input*/NULL);
+
+	// this was not done in old lwip and is needed at least for lwip2 dhcp client
+	netif_git[netif_idx].flags |= NETIF_FLAG_UP;
+}
+
+void esp2glue_netif_set_addr (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw)
+{
+	ip4_addr_t aip = { ip }, amask = { mask }, agw = { gw };
+	netif_set_addr(&netif_git[netif_idx], &aip, &amask, &agw);
 }
 
 void esp2glue_lwip_init (void)
 {
 	lwip_init();
 
+#if 0
 	// fill output, linkoutput, name
 	// all others shall be overwritten by netif_add below
 	memset(&netif_git[0], 0, sizeof(netif_git[0]));
 	memset(&netif_git[1], 0, sizeof(netif_git[1]));
-	setup_netif(STATION_IF);
-	setup_netif(SOFTAP_IF);
-	
+	//setup_netif(STATION_IF);
+	//setup_netif(SOFTAP_IF);
+#endif
+#if 0
+	// input is directly called by esp to glue
 	ip4_addr_t zero = { 0 };
-	netif_add(&netif_git[STATION_IF], &zero, &zero, &zero, /*state*/NULL, emptinit, /*useless input*/NULL);
-	netif_add(&netif_git[SOFTAP_IF],  &zero, &zero, &zero, /*state*/NULL, emptinit, /*useless input*/NULL);
+	netif_add(&netif_git[STATION_IF], &zero, &zero, &zero, /*state*/NULL, netif_init_sta, /*useless input*/NULL);
+	netif_add(&netif_git[SOFTAP_IF],  &zero, &zero, &zero, /*state*/NULL, netif_init_ap,  /*useless input*/NULL);
+#endif
 }
 
 void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, glue_netif_flags_t flags, uint32_t hwlen, const uint8_t* hw /*, void* state*/)
@@ -452,10 +356,6 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 
 	struct netif* netif = &netif_git[netif_idx];
 
-	// done in lwip_init
-	//if (!netif_git_initialized[netif_idx])
-	//	setup_netif(netif_idx);
-	
 	if (!netif->ip_addr.addr)
 	{
 		netif->ip_addr.addr = ip;
@@ -475,10 +375,10 @@ void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t
 		if (hwlen == 6)
 		{
 			os_memcpy(netif->hwaddr, hw, hwlen);
-			sprintf(hostname_sta, "esp8266_%02x%02x%02x%02x%02x%02x", hw[0], hw[1], hw[2], hw[3], hw[4], hw[5]);
+			sprintf(hostname, "esp8266_%02x%02x%02x%02x%02x%02x", hw[0], hw[1], hw[2], hw[3], hw[4], hw[5]);
 		}
 		else
-			hostname_sta[0] = 0;
+			hostname[0] = 0;
 	}
 	
 	uprint(DBG "netif updated: ");
@@ -500,7 +400,7 @@ err_glue_t esp2glue_ethernet_input (int netif_idx, void* received)
 	//display_ip32(" ip=", netif_git[netif_idx].ip_addr.addr);
 	//nl();
 	
-	return new2glue_err(ethernet_input((struct pbuf*)received, &netif_git[netif_idx]));
+	return git2glue_err(ethernet_input((struct pbuf*)received, &netif_git[netif_idx]));
 }
 
 void esp2glue_dhcps_start (struct ip_info* info)
