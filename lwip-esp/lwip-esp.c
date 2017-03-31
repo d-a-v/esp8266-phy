@@ -36,8 +36,8 @@ struct netif *netif_default;
 ///////////////////////////////////////
 // netif
 
-#define netif_sta netif_esp[STATION_IF]
-#define netif_ap  netif_esp[SOFTAP_IF]
+#define netif_sta netif_esp[STATION_IF]		// hardly used
+#define netif_ap  netif_esp[SOFTAP_IF]		// hardly used
 static struct netif* netif_esp[2] = { NULL, NULL };
 
 ///////////////////////////////////////
@@ -144,11 +144,9 @@ static void stub_display_netif_flags (int flags)
 
 static void stub_display_netif (struct netif* netif)
 {
-	uassert(!netif_sta || netif == netif_sta);
-	uassert(!netif_ap  || netif == netif_ap);
 	uprint("esp-@%p idx=%d %s name=%c%c%d state=%p ",
 		netif, netif->num,
-		netif->num == SOFTAP_IF? "AP": "STA",
+		netif->num == SOFTAP_IF? "AP": netif->num == STATION_IF? "STA": "???",
 		netif->name[0], netif->name[1], netif->num,
 		netif->state);
 	if (netif->hwaddr_len == 6)
@@ -245,7 +243,7 @@ static void pbuf_wrapper_release (struct pbuf_wrapper* p)
 
 err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, void* data, size_t size)
 {
-	doprint_allow = 1;
+//	doprint_allow = 1;
 	
 	struct pbuf_wrapper* p = pbuf_wrapper_get();
 	if (!p)
@@ -279,6 +277,8 @@ err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, void* data, size_
 	return esp2glue_err(err);
 }
 
+#if 0
+
 void blobs_getinfo (void)
 {
 	struct netif* test_netif_sta = eagle_lwip_getif(STATION_IF);
@@ -301,6 +301,7 @@ void blobs_getinfo (void)
 	else uprint(DBG "ap not initialized\n");
 }
 
+
 // some checks + give netif index
 static int esp_netif_update (struct netif* netif)
 {
@@ -322,6 +323,8 @@ static int esp_netif_update (struct netif* netif)
 	
 	return netif_idx;
 }
+
+#endif
 
 int esp_guess_netif_idx (struct netif* netif)
 {
@@ -446,18 +449,18 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 void dhcps_start (struct ip_info* info)
 {
 	// at that point, assume that serial port is open for printing debug output
-	doprint_allow = 1;
+//	doprint_allow = 1;
 
 	uprint(DBG "dhcps_start ");
 	display_ip_info(info);
 	uprint("\n");
 	
- 	esp2glue_dhcps_start(info);
- 	
 	if (netif_ap)
 		///XXX this is mandatory for blobs to be happy
 		// but we should get this info back through glue
 	 	netif_ap->flags |= NETIF_FLAG_UP | NETIF_FLAG_LINK_UP;
+
+ 	esp2glue_dhcps_start(info);
 }
 
 void dhcps_stop (void)
@@ -502,7 +505,7 @@ err_t dhcp_release (struct netif* netif)
 err_t dhcp_start (struct netif* netif)
 {
 	// at that point, assume that serial port is open for printing debug output
-	doprint_allow = 1;
+//	doprint_allow = 1;
 
 	uprint(DBG "dhcp_start ");
 	stub_display_netif(netif);
@@ -649,7 +652,8 @@ void netif_remove (struct netif *netif)
 {
 	(void)netif;
 	STUB(netif_remove);
-	uprint(DBG "trying to remove netif %p %s\n", netif, netif == netif_ap? "AP": netif == netif_sta? "STA": "??");
+	uprint(DBG "trying to remove netif ");
+	stub_display_netif(netif);
 }
 
 /**
@@ -708,7 +712,8 @@ void netif_set_down (struct netif* netif)
 	uprint(DBG "netif_set_down  ");
 	stub_display_netif(netif);
 	
-	netif->flags &= ~(NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);
+//XXX netif_set_up is never called!
+//	netif->flags &= ~(NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);
 //	esp_netif_update(netif);
 }
 
@@ -723,7 +728,7 @@ void netif_set_down (struct netif* netif)
  */ 
 void netif_set_up (struct netif* netif)
 {
-	uprint(DBG "netif_set_up ");
+	uerror(DBG "netif_set_up is called??");
 	stub_display_netif(netif);
 
 	netif->flags |= (NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);

@@ -70,10 +70,17 @@ static int nl_putc (int c)
 	return c;
 }
 
+extern uint32_t millis (void);
+
 int doprint (const char* format, ...)
 {
 	int ret;
 	int (*myputc)(int);
+
+static uint32_t glok = 0;
+if (glok == 0) glok = millis();
+doprint_allow = (millis() - glok) > 2000;
+
 	
 	if (doprint_allow)
 	{

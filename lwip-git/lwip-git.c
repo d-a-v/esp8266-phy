@@ -319,8 +319,19 @@ void esp2glue_netif_add (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw,
 		netif_idx == STATION_IF? netif_init_sta: netif_init_ap,
 		/*useless input*/NULL);
 
+	//XXX get these through esp2glue~flags() ?
+	netif_git[netif_idx].flags |= NETIF_FLAG_ETHARP;
+	netif_git[netif_idx].flags |= NETIF_FLAG_BROADCAST;
+
 	// this was not done in old lwip and is needed at least for lwip2 dhcp client
+uprint(DBG "set up now\n");
+#if 0
+	netif_set_link_up(&netif_git[netif_idx]);
+	netif_set_up(&netif_git[netif_idx]);
+#else
 	netif_git[netif_idx].flags |= NETIF_FLAG_UP;
+	netif_git[netif_idx].flags |= NETIF_FLAG_LINK_UP;
+#endif
 }
 
 void esp2glue_netif_set_addr (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw)
