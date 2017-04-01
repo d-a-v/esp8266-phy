@@ -156,11 +156,13 @@ int lwiperr_check (const char* what, err_t err)
 	return 1;
 }
 
-err_glue_t esp2glue_dhcp_start ()
+err_glue_t esp2glue_dhcp_start (int netif_idx)
 {
 	uprint(DBG "dhcp_start netif: ");
-	new_display_netif(netif_sta);
-	err_t err = dhcp_start(netif_sta);
+//	new_display_netif(&netif_git[netif_idx]);
+new_display_netif(netif_sta);
+//	err_t err = dhcp_start(&netif_git[netif_idx]);
+err_t err = dhcp_start(netif_sta);
 	uprint(DBG "new_dhcp_start returns %d\n", err);
 	return git2glue_err(err);
 }
@@ -324,8 +326,8 @@ void esp2glue_netif_add (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw,
 	netif_git[netif_idx].flags |= NETIF_FLAG_BROADCAST;
 
 	// this was not done in old lwip and is needed at least for lwip2 dhcp client
-uprint(DBG "set up now\n");
 #if 0
+uprint(DBG "set up now idx=%d\n", netif_idx);
 	netif_set_link_up(&netif_git[netif_idx]);
 	netif_set_up(&netif_git[netif_idx]);
 #else
@@ -416,5 +418,7 @@ err_glue_t esp2glue_ethernet_input (int netif_idx, void* received)
 
 void esp2glue_dhcps_start (struct ip_info* info)
 {
+	uprint(DBG "call dhcps_start\n");
 	dhcps_start(info);
+	uprint(DBG "called dhcps_start\n");
 }

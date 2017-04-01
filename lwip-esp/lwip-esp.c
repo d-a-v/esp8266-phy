@@ -504,14 +504,10 @@ err_t dhcp_release (struct netif* netif)
  */
 err_t dhcp_start (struct netif* netif)
 {
-	// at that point, assume that serial port is open for printing debug output
-//	doprint_allow = 1;
-
 	uprint(DBG "dhcp_start ");
 	stub_display_netif(netif);
 
-//	esp_netif_update(netif);
-	return glue2esp_err(esp2glue_dhcp_start());
+	return glue2esp_err(esp2glue_dhcp_start(esp_guess_netif_idx(netif)));
 }
 
 void dhcp_stop (struct netif* netif)
@@ -536,6 +532,9 @@ void dhcp_stop (struct netif* netif)
  * @return netif, or NULL if failed.
  */
  
+struct netif* netif_list = NULL;
+static int netifnum = 0;
+
 struct netif* netif_add (
 	struct netif* netif,
 	ip_addr_t* ipaddr,
@@ -546,15 +545,16 @@ struct netif* netif_add (
 	netif_input_fn packet_incoming)
 {
 	// netif->output is "packet_ougtoing" already initialized
-	// packet_incoming is given for us to put in *netif
-	//STUB(netif_add);
+	
 
-	//display_ip32("STUB: netif_add ip=", *ipaddr);
-	//display_ip32(" mask=", *netmask);
-	//display_ip32(" gw=", *gw);
-	//uprint(" state=%p init=%p input=%p ", state, init, packet_incoming);
-	//stub_display_netif(netif);
-	//uprint("\n");
+	uprint(DBG " netif_add ");
+	stub_display_netif(netif);
+
+if (netifnum == 2)
+{
+	uerror(DBG "ADD but netifnum=2\n");
+	return NULL;
+}
 	
 	//////////////////////////////
 	// this is revisited ESP lwip implementation
@@ -590,7 +590,6 @@ struct netif* netif_add (
 		#endif /* ENABLE_LOOPBACK */
 	netif->state = state;
 
-	static int netifnum = 0;
 	netif->num = netifnum++;
 
 	uassert(packet_incoming = ethernet_input);
@@ -616,7 +615,6 @@ struct netif* netif_add (
 		return NULL;
 	}
 
-	static struct netif* netif_list = NULL;
 	netif->next = netif_list;
 	netif_list = netif;
 	
@@ -650,10 +648,52 @@ struct netif* netif_add (
  */
 void netif_remove (struct netif *netif)
 {
-	(void)netif;
 	STUB(netif_remove);
-	uprint(DBG "trying to remove netif ");
+return;
+
+	if (!netif)
+		return;
+	
+	uprint(DBG "remove netif ");
 	stub_display_netif(netif);
+
+	// call glue
+//	esp2glue_netif_remove(netif->num);
+	
+	//if (netif_is_up(netif))
+	//	netif_set_down(netif);
+	
+	/*  is it the first netif? */
+	if (netif_list == netif)
+	{
+uprint(DBG "AA\n");
+//		netif_list = netif->next;
+	}
+	else
+	{
+		struct netif* tmpNetif;
+		for (tmpNetif = netif_list; tmpNetif != NULL; tmpNetif = tmpNetif->next)
+			if (tmpNetif->next == netif)
+			{
+uprint(DBG "AB\n");
+//				tmpNetif->next = netif->next;
+				break;
+			}
+		if (tmpNetif == NULL)
+		{
+			uerror(DBG "internal error - trying to remove non-existant netif\n");
+			return;
+		}
+	}
+
+	if (netif->next)
+		uerror(DBG "internal error - removing netif which is not last\n");
+	else
+{}//		netifnum--;
+	
+	/* this netif is default? */
+	if (netif_default == netif)
+		netif_default = NULL;
 }
 
 /**
@@ -696,7 +736,7 @@ void netif_set_default (struct netif* netif)
 	int netif_idx = esp_guess_netif_idx(netif);
 	uprint(DBG "netif_set_default %d\n", netif_idx);
 	netif_default = netif;
-	esp2glue_netif_set_default(esp_guess_netif_idx(netif));
+	esp2glue_netif_set_default(netif_idx);
 }
 
 /**
@@ -712,8 +752,8 @@ void netif_set_down (struct netif* netif)
 	uprint(DBG "netif_set_down  ");
 	stub_display_netif(netif);
 	
-//XXX netif_set_up is never called!
-//	netif->flags &= ~(NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);
+	netif->flags &= ~NETIF_FLAG_UP;
+	// ??? leave glue up ???
 //	esp_netif_update(netif);
 }
 
@@ -731,7 +771,8 @@ void netif_set_up (struct netif* netif)
 	uerror(DBG "netif_set_up is called??");
 	stub_display_netif(netif);
 
-	netif->flags |= (NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);
+	netif->flags |= NETIF_FLAG_UP;
+	// ??? glue is already up ??
 //	esp_netif_update(netif);
 }
 
