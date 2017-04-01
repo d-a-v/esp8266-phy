@@ -151,6 +151,8 @@ static void stub_display_netif (struct netif* netif)
 		netif->state);
 	if (netif->hwaddr_len == 6)
 		display_mac(netif->hwaddr);
+	else
+		uprint("(no mac?)");
 	stub_display_netif_flags(netif->flags);
 	display_ip32(" ip=", netif->ip_addr.addr);
 	display_ip32(" mask=", netif->netmask.addr);
@@ -243,8 +245,6 @@ static void pbuf_wrapper_release (struct pbuf_wrapper* p)
 
 err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, void* data, size_t size)
 {
-//	doprint_allow = 1;
-	
 	struct pbuf_wrapper* p = pbuf_wrapper_get();
 	if (!p)
 		return GLUE_ERR_MEM;
@@ -352,7 +352,7 @@ int esp_guess_netif_idx (struct netif* netif)
 	
 	if (ret < 0 || ret > 1)
 	{
-		uerror(DBG "guess netif: default STA");
+		uerror(DBG "guess netif: ERROR default STA");
 		ret = STATION_IF;
 	}
 	return ret;
@@ -361,12 +361,10 @@ int esp_guess_netif_idx (struct netif* netif)
 ///////////////////////////////////////
 // STUBS / wrappers
 
-void lwip_init_RENAMED (void); //XXX should use esp2glue_lwip_init()
 void lwip_init (void)
 {
-	esp2glue_lwip_init();
-	
 	uprint(DBG "lwip_init\n");
+	esp2glue_lwip_init();
 }
 
 /**
@@ -433,8 +431,7 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 		// copy data
 		os_memcpy(glue_data, p->payload, p->len);
 
-	// release asap blob's buffer
-	// thus avoiding the BMOD "LmacRxBlk:1"
+	// release blob's buffer asap
 	pbuf_free(p);
 
 	if (!glue_pbuf)
@@ -448,9 +445,6 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 
 void dhcps_start (struct ip_info* info)
 {
-	// at that point, assume that serial port is open for printing debug output
-//	doprint_allow = 1;
-
 	uprint(DBG "dhcps_start ");
 	display_ip_info(info);
 	uprint("\n");
@@ -532,8 +526,8 @@ void dhcp_stop (struct netif* netif)
  * @return netif, or NULL if failed.
  */
  
-struct netif* netif_list = NULL;
-static int netifnum = 0;
+static int esp_netif_num = 0;
+static struct netif* esp_netif_list = NULL;
 
 struct netif* netif_add (
 	struct netif* netif,
@@ -544,17 +538,8 @@ struct netif* netif_add (
 	netif_init_fn init,
 	netif_input_fn packet_incoming)
 {
-	// netif->output is "packet_ougtoing" already initialized
-	
-
-	uprint(DBG " netif_add ");
+	uprint(DBG "netif_add ");
 	stub_display_netif(netif);
-
-if (netifnum == 2)
-{
-	uerror(DBG "ADD but netifnum=2\n");
-	return NULL;
-}
 	
 	//////////////////////////////
 	// this is revisited ESP lwip implementation
@@ -590,14 +575,8 @@ if (netifnum == 2)
 		#endif /* ENABLE_LOOPBACK */
 	netif->state = state;
 
-	netif->num = netifnum++;
-
 	uassert(packet_incoming = ethernet_input);
-#if 1
 	netif->input = ethernet_input;
-#else
-	netif->input = packet_incoming; // inside blobs
-#endif
 
 		#if LWIP_NETIF_HWADDRHINT
 		#error
@@ -615,27 +594,40 @@ if (netifnum == 2)
 		return NULL;
 	}
 
-	netif->next = netif_list;
-	netif_list = netif;
-	
-//XXX	snmp_inc_iflist();
-	#if LWIP_IGMP
-	// ok
-//XXX	if (netif->flags & NETIF_FLAG_IGMP)
-//XXX		igmp_start(netif);
-	#endif /* LWIP_IGMP */
+	if (esp_netif_num == 2)
+	{
+		if (netif == netif_sta)
+		{
+			uprint(DBG "esp trying to re-add STA\n");
+			uassert(netif->num == STATION_IF);
+		}
+		else if (netif == netif_ap)
+		{
+			uprint(DBG "esp trying to re-add AP\n");
+			uassert(netif->num == SOFTAP_IF);
+		}
+		else
+			uerror(DBG "esp is messing with me\n");
+
+		// assume hwaddr has not changed
+		esp2glue_netif_set_addr(netif->num, ipaddr->addr, netmask->addr, gw->addr);
+	}
+	else
+	{
+		netif->num = esp_netif_num++;
+		netif->next = esp_netif_list;
+		esp_netif_list = netif;
+
+		uassert(!netif_esp[netif->num]);
+		netif_esp[netif->num] = netif;
+
+		esp2glue_netif_add(netif->num, ipaddr->addr, netmask->addr, gw->addr, netif->hwaddr_len, netif->hwaddr);
+	}
+
 	//////////////////////////////
 	
-	uassert(netif->num < 2);
-
-	uprint(DBG "netif_add:\n");
-	
-	esp2glue_netif_add(netif->num, ipaddr->addr, netmask->addr, gw->addr, netif->hwaddr_len, netif->hwaddr);
-
+	netif->flags |= NETIF_FLAG_LINK_UP;
 	netif_set_addr(netif, ipaddr, netmask, gw);
-	
-	uassert(!netif_esp[netif->num]);
-	netif_esp[netif->num] = netif;
 	
 	return netif;
 }
@@ -646,54 +638,14 @@ if (netifnum == 2)
  *
  * @param netif the network interface to remove
  */
-void netif_remove (struct netif *netif)
+void netif_remove (struct netif* netif)
 {
-	STUB(netif_remove);
-return;
-
-	if (!netif)
-		return;
-	
-	uprint(DBG "remove netif ");
+	(void)netif;
+	uprint(DBG "trying to remove netif ");
 	stub_display_netif(netif);
-
-	// call glue
-//	esp2glue_netif_remove(netif->num);
 	
-	//if (netif_is_up(netif))
-	//	netif_set_down(netif);
-	
-	/*  is it the first netif? */
-	if (netif_list == netif)
-	{
-uprint(DBG "AA\n");
-//		netif_list = netif->next;
-	}
-	else
-	{
-		struct netif* tmpNetif;
-		for (tmpNetif = netif_list; tmpNetif != NULL; tmpNetif = tmpNetif->next)
-			if (tmpNetif->next == netif)
-			{
-uprint(DBG "AB\n");
-//				tmpNetif->next = netif->next;
-				break;
-			}
-		if (tmpNetif == NULL)
-		{
-			uerror(DBG "internal error - trying to remove non-existant netif\n");
-			return;
-		}
-	}
-
-	if (netif->next)
-		uerror(DBG "internal error - removing netif which is not last\n");
-	else
-{}//		netifnum--;
-	
-	/* this netif is default? */
-	if (netif_default == netif)
-		netif_default = NULL;
+	esp2glue_netif_set_updown(netif->num, 0);
+	netif->flags &= ~NETIF_FLAG_LINK_UP;
 }
 
 /**
@@ -733,10 +685,9 @@ void netif_set_addr (struct netif* netif, ip_addr_t* ipaddr, ip_addr_t* netmask,
  */
 void netif_set_default (struct netif* netif)
 {
-	int netif_idx = esp_guess_netif_idx(netif);
-	uprint(DBG "netif_set_default %d\n", netif_idx);
+	uprint(DBG "netif_set_default %d\n", esp_guess_netif_idx(netif));
 	netif_default = netif;
-	esp2glue_netif_set_default(netif_idx);
+	esp2glue_netif_set_default(esp_guess_netif_idx(netif));
 }
 
 /**
@@ -752,9 +703,8 @@ void netif_set_down (struct netif* netif)
 	uprint(DBG "netif_set_down  ");
 	stub_display_netif(netif);
 	
-	netif->flags &= ~NETIF_FLAG_UP;
-	// ??? leave glue up ???
-//	esp_netif_update(netif);
+	netif->flags &= ~(NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);
+	esp2glue_netif_set_updown(netif->num, 0);
 }
 
 /**
@@ -771,9 +721,8 @@ void netif_set_up (struct netif* netif)
 	uerror(DBG "netif_set_up is called??");
 	stub_display_netif(netif);
 
-	netif->flags |= NETIF_FLAG_UP;
-	// ??? glue is already up ??
-//	esp_netif_update(netif);
+	netif->flags |= (NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);
+	esp2glue_netif_set_updown(netif->num, 1);
 }
 
 /**

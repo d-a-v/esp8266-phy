@@ -745,7 +745,13 @@ void ICACHE_FLASH_ATTR dhcps_start(struct ip_info *info)
     //apnetif->dhcps_pcb = pcb_dhcps;
     apnetif->state = pcb_dhcps;
 
-    IP4_ADDR(&broadcast_dhcps, 255, 255, 255, 255);
+    
+//  wrong: answer will go to sta  IP4_ADDR(&broadcast_dhcps, 255, 255, 255, 255);
+//  good: going to ap IP4_ADDR(&broadcast_dhcps, 192, 168, 4, 255);
+//  semi proper way:
+    broadcast_dhcps = apnetif->ip_addr;
+    broadcast_dhcps.addr &= apnetif->netmask.addr;
+    broadcast_dhcps.addr |= ~apnetif->netmask.addr;
 
     server_address = info->ip;
     wifi_softap_init_dhcps_lease(server_address.addr);
@@ -758,7 +764,7 @@ void ICACHE_FLASH_ATTR dhcps_start(struct ip_info *info)
 
     wifi_set_ip_info(SOFTAP_IF, info); // added for lwip-git, not sure whether useful
     netif_ap->flags |= NETIF_FLAG_UP | NETIF_FLAG_LINK_UP; // added for lwip-git
-    netif_set_default(netif_ap);
+    // useless and wrong. default should be sta. netif_set_default(netif_ap);
 }
 
 void ICACHE_FLASH_ATTR dhcps_stop(void)

@@ -159,10 +159,8 @@ int lwiperr_check (const char* what, err_t err)
 err_glue_t esp2glue_dhcp_start (int netif_idx)
 {
 	uprint(DBG "dhcp_start netif: ");
-//	new_display_netif(&netif_git[netif_idx]);
-new_display_netif(netif_sta);
-//	err_t err = dhcp_start(&netif_git[netif_idx]);
-err_t err = dhcp_start(netif_sta);
+	new_display_netif(&netif_git[netif_idx]);
+	err_t err = dhcp_start(&netif_git[netif_idx]);
 	uprint(DBG "new_dhcp_start returns %d\n", err);
 	return git2glue_err(err);
 }
@@ -199,7 +197,6 @@ void dhcp_set_ntp_servers (u8_t number, const ip4_addr_t* ntp_server_addrs)
 
 err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 {
-
 	#if !LWIP_NETIF_TX_SINGLE_PBUF
 	#warning ESP netif->linkoutput cannot handle pbuf chains.
 	#error LWIP_NETIF_TX_SINGLE_PBUF must be 1 in lwipopts.h
@@ -207,15 +204,16 @@ err_t new_linkoutput (struct netif* netif, struct pbuf* p)
 	uassert(p->next == NULL);
 	uassert(p->len == p->tot_len);
 
-	// protect pbuf, so lwip2 won't free it before phy finishes sending
+	// protect pbuf, so lwip2(git) won't free it before phy(esp) finishes sending
 	pbuf_ref(p);
+	
+	uassert(netif->num == STATION_IF || netif->num == SOFTAP_IF);
 
-	int netif_idx = netif == netif_sta? STATION_IF: SOFTAP_IF;
-
-	uprint(DBG "linkoutput: netif@%p (%s)\n", netif, netif_name[netif_idx]);
+	uprint(DBG "linkoutput: netif@%p (%s)\n", netif, netif_name[netif->num]);
+	uprint(DBG "linkoutput default netif was: %d\n", netif_default? netif_default->num: -1);
 
 	err_t err = glue2git_err(glue2esp_linkoutput(
-		netif_idx,
+		netif->num,
 		p, p->payload, p->len));
 
 	if (err != ERR_OK)
@@ -244,7 +242,7 @@ static err_t new_input (struct pbuf *p, struct netif *inp)
 void esp2glue_netif_set_default (int netif_idx)
 {
 	uprint(DBG "netif set default %s\n", netif_name[netif_idx]);
-	netif_set_default(&netif_git[netif_idx]);
+	netif_set_default(netif_idx == STATION_IF || netif_idx == SOFTAP_IF? &netif_git[netif_idx]: NULL);
 }
 
 static void netif_sta_status_callback (struct netif* netif)
@@ -327,7 +325,7 @@ void esp2glue_netif_add (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw,
 
 	// this was not done in old lwip and is needed at least for lwip2 dhcp client
 #if 0
-uprint(DBG "set up now idx=%d\n", netif_idx);
+	uprint(DBG "set up now idx=%d\n", netif_idx);
 	netif_set_link_up(&netif_git[netif_idx]);
 	netif_set_up(&netif_git[netif_idx]);
 #else
@@ -418,7 +416,20 @@ err_glue_t esp2glue_ethernet_input (int netif_idx, void* received)
 
 void esp2glue_dhcps_start (struct ip_info* info)
 {
-	uprint(DBG "call dhcps_start\n");
 	dhcps_start(info);
-	uprint(DBG "called dhcps_start\n");
+}
+
+void esp2glue_netif_set_updown (int netif_idx, int up1_or_down0)
+{
+	struct netif* netif = &netif_git[netif_idx];
+	if (up1_or_down0)
+	{
+		netif_set_link_up(netif);
+		netif_set_up(netif);
+	}
+	else
+	{
+		netif_set_link_down(netif);
+		netif_set_down(netif);
+	}
 }

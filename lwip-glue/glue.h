@@ -2,12 +2,12 @@
 #ifndef GLUE_STUB_H
 #define GLUE_STUB_H
 
-#define UDEBUG 1	// 0 or 1
-
 #include "ets_sys.h"
 #include "osapi.h"
 #include "user_interface.h"
 #include "esp-missing.h"
+
+#define UDEBUG 0	// 0 or 1
 
 #include "uprint.h"
 #include "doprint.h"
@@ -67,6 +67,7 @@ void		esp2glue_pbuf_freed		(void* ref_saved);
 void		esp2glue_netif_set_default	(int netif_idx);
 void		esp2glue_netif_add		(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, size_t hwlen, const uint8_t* hwaddr);
 void		esp2glue_netif_set_addr		(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw);
+void		esp2glue_netif_set_updown	(int netif_idx, int up1_or_down0);
 
 void		glue2esp_ifup			(int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw);
 err_glue_t	glue2esp_linkoutput		(int netif_idx, void* ref2save, void* data, size_t size);

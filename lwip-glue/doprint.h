@@ -6,7 +6,7 @@
 // ets_putc always work (after Serial.begin())
 // doprint uses ets_putc after doprint_allow gets true and bufferizes before that
 
-extern char doprint_allow;
+extern int doprint_allow;
 int doprint (const char* format, ...) __attribute__ ((format (printf, 1, 2)));
 
 

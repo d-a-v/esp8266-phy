@@ -7,7 +7,7 @@
 #include <mem.h>
 #include <ets_sys.h>
 
-char doprint_allow = 0;
+int doprint_allow = 0;
 
 #if 0
 
@@ -26,7 +26,7 @@ int doprint (const char* format, ...)
 
 // bufferize
 
-#define ROTBUFLEN_BIT	11 // 11=2048
+#define ROTBUFLEN_BIT	12 // 11=2048
 #define ROTBUFLEN	(1 << (ROTBUFLEN_BIT))
 #define ROTBUFLEN_MASK	((ROTBUFLEN) - 1)
 
@@ -69,6 +69,8 @@ static int nl_putc (int c)
 		doprint_direct("%d:", nl++);
 	return c;
 }
+
+extern uint32_t millis (void);
 
 int doprint (const char* format, ...)
 {
