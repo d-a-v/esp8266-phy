@@ -28,8 +28,9 @@ typedef int sys_prot_t;	// not really used
 
 #define LWIP_DEBUG 1
 
-int doprint (const char* format, ...) __attribute__ ((format (printf, 1, 2)));
-#define LWIP_PLATFORM_DIAG(x) do { doprint x;} while(0)
+//int doprint (const char* format, ...) __attribute__ ((format (printf, 1, 2)));
+extern int os_printf_plus(const char * format, ...) __attribute__ ((format (printf, 1, 2)));
+#define LWIP_PLATFORM_DIAG(x) do { os_printf x;} while(0)
 
 #endif // debug
 

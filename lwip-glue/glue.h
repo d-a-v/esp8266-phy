@@ -12,20 +12,30 @@
 #include "uprint.h"
 #include "doprint.h"
 
+// 0: use os_printf
+// 1: buffered and line number, needs doprint_allow=1 after Serial.begin
 #if UDEBUG
-#define uprint(x...)	do { doprint(x); } while (0)
+#undef	os_printf
+#define	os_printf	uprint
+#define UPRINTF 	doprint
+#else
+#define UPRINTF 	os_printf
+#ifdef USE_OPTIMIZE_PRINTF // bug in osapi.h
+extern int os_printf_plus(const char * format, ...) __attribute__ ((format (printf, 1, 2)));
+#endif
+#endif
+
+#if UDEBUG
+#define uprint(x...)	do { UPRINTF(x); } while (0)
 #else
 #define uprint(x...)	do { (void)0; } while (0)
 #endif
 
-#define uerror(x...)	do { doprint(x); } while (0)
-#define uassert(ass...)	do { if ((ass) == 0) { doprint("assert fail: " #ass " @%s:%d\n", __FILE__, __LINE__); uhalt(); } } while (0)
-//#define uhalt() 	do { esp_yield(); } while (1)
+#define uerror(x...)	do { UPRINTF(x); } while (0)
+#define uassert(ass...)	do { if ((ass) == 0) { UPRINTF("assert fail: " #ass " @%s:%d\n", __FILE__, __LINE__); uhalt(); } } while (0)
 #define uhalt()		do { (void)0; } while (0)
 #define nl()		do { uprint("\n"); } while (0)
 
-#undef os_printf
-#define os_printf uprint
 
 typedef enum
 {

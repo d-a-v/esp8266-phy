@@ -72,11 +72,38 @@ static int nl_putc (int c)
 
 extern uint32_t millis (void);
 
-int doprint (const char* format, ...)
+#if STRING_IN_FLASH
+// http://marrin.org/2017/01/16/putting-data-in-esp8266-flash-memory/
+// https://github.com/cmarrin/m8rscript/blob/master/esp/core/Esp.{h,cpp}
+static inline uint8_t readRomByte(const uint8_t* addr)
+{
+    uint32_t bytes;
+    bytes = *(uint32_t*)((uint32_t)addr & ~3);
+    return ((uint8_t*)&bytes)[(uint32_t)addr & 3];
+}
+size_t ROMstrlen(const char* s)
+{
+    const char* p;
+    for (p = s; readRomByte((uint8_t*)p) != '\0'; p++) ;
+    return (size_t) (p - s);
+}
+char* ROMCopyString(char* dst, const char* src)
+{
+    uint8_t* s = (uint8_t*) src;
+    char c;
+    while ((c = (char) readRomByte(s++))) {
+        *dst++ = c;
+    }
+    *dst = '\0';
+    return dst;
+}
+#endif
+
+int doprint_minus (const char* minus_format, ...)
 {
 	int ret;
 	int (*myputc)(int);
-
+	
 	if (doprint_allow)
 	{
 		if (rotbuf)
@@ -99,10 +126,22 @@ int doprint (const char* format, ...)
 	else
 		myputc = bufputc;
 
+#if STRING_IN_FLASH
+	size_t fmtlen = ROMstrlen(minus_format);
+	char* format = os_malloc(fmtlen + 1);
+	ROMCopyString(format, minus_format);
+#else
+#define format minus_format
+#endif
+
 	va_list ap;
-	va_start(ap, format);
+	va_start(ap, minus_format);
 	ret += ets_vprintf(myputc, format, ap);
 	va_end(ap);
+
+#if STRING_IN_FLASH
+	os_free(format);
+#endif
 	
 	return ret;
 }
