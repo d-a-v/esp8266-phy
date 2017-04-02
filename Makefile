@@ -1,26 +1,31 @@
 
-LWIP_LIB_RELEASE ?= $(SDK_PATH)/lib/liblwip_gcc.a
-LWIP_LIB ?= liblwip_src.a
-SDK_PATH ?= $(abspath ../esp8266/tools/sdk)
-ESP_LWIP ?= $(SDK_PATH)/lwip
+ROOT	= .
+include $(ROOT)/Makefile.common
 
 all clean: prepare
-	make -f Makefile.lwip-esp $@
-	make -f Makefile.lwip-git $@
+	make -f Makefile.lwip-esp ROOT=$(ROOT) $@
+	make -f Makefile.lwip-git ROOT=$(ROOT) $@
 
 prepare:
-	test -r $(ESP_LWIP) && { test -L $(ESP_LWIP) || mv $(ESP_LWIP) $(ESP_LWIP).orig; } || true
+	@# rename original lwip directory -> lwip.orig
+	test -r $(ESP_LWIP) && { test -L $(ESP_LWIP) || mv $(ESP_LWIP) $(ESP_LWIP_ORIG); } || true
+	@# copy original library file
+	test -f $(LWIP_LIB_RELEASE_ORIG) || cp $(LWIP_LIB_RELEASE) $(LWIP_LIB_RELEASE_ORIG)
 
 install release: all
-	test -f $(LWIP_LIB_RELEASE).orig || cp $(LWIP_LIB_RELEASE) $(LWIP_LIB_RELEASE).orig
-	cp -f $(LWIP_LIB) $(LWIP_LIB_RELEASE)
-	rm -f $(ESP_LWIP); ln -sf $(abspath lwip-git-src) $(ESP_LWIP)
+	@# (re)symlink library file
+	rm -f $(LWIP_LIB_RELEASE)
+	ln -sf $(abspath $(LWIP_LIB)) $(LWIP_LIB_RELEASE)
+	@# (re)symlink lwip directory to the new one
+	rm -f $(ESP_LWIP)
+	ln -sf $(abspath lwip-git-src) $(ESP_LWIP)
+	@# (re)symlink some include files to the right place from esp point of view
 	rm -f lwip-git-src/src/include/arch; ln -sf $(abspath lwip-git/arch) lwip-git-src/src/include
 	rm -f lwip-git-src/include; ln -sf src/include lwip-git-src/include
 	ln -sf $(abspath lwip-git/lwipopts.h) $(abspath lwip-glue/esp-missing.h) lwip-git-src/src/include
 
-try: all install
-
-revert: prepare
-	cp $(LWIP_LIB_RELEASE).orig $(LWIP_LIB_RELEASE)
-	rm -f $(ESP_LWIP); ln -sf lwip.orig $(ESP_LWIP)
+disappear revert:
+	@# restore original library file
+	test -r $(LWIP_LIB_RELEASE_ORIG) && rm -f $(LWIP_LIB_RELEASE) && cp $(LWIP_LIB_RELEASE_ORIG) $(LWIP_LIB_RELEASE)
+	@# restore original lwip directory
+	test -r $(ESP_LWIP_ORIG) && rm -f $(ESP_LWIP) && mv $(ESP_LWIP_ORIG) $(ESP_LWIP) || true

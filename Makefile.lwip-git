@@ -1,23 +1,21 @@
 
+# this one is executed from directory lwip-git-src/src/
+
+include $(ROOT)/Makefile.common
+
 all clean:
-	cd lwip-git-src/src && $(MAKE) -f ../../Makefile.lwip-git j$@
+	cd lwip-git-src/src && $(MAKE) -f $(ROOT)/../../Makefile.lwip-git ROOT=$(ROOT)/../.. j$@
 
-
-ESP8266 ?= ../../../esp8266
-TOOLS_PATH ?= $(ESP8266)/tools/xtensa-lx106-elf/bin/xtensa-lx106-elf-
-LWIP_LIB ?= ../../liblwip_src.a
-SDK_PATH ?= $(abspath $(ESP8266)/tools/sdk)
-
-BUILD_PATH_STUB = ../lwip-git ../lwip-glue
-BUILD_PATH = build
+BUILD_STUB = ../lwip-git ../lwip-glue
+BUILD = build
 LWIP_SRCS = \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard netif/ethernet.c)) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard core/*.c)) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard core/ipv4/*.c)) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard core/ipv6/*.c)) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard api/*.c)) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard ../../lwip-git/*.c)) \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard ../../lwip-glue/*.c)) \
+	$(patsubst %.c,$(BUILD)/%.o,$(wildcard netif/ethernet.c)) \
+	$(patsubst %.c,$(BUILD)/%.o,$(wildcard core/*.c)) \
+	$(patsubst %.c,$(BUILD)/%.o,$(wildcard core/ipv4/*.c)) \
+	$(patsubst %.c,$(BUILD)/%.o,$(wildcard core/ipv6/*.c)) \
+	$(patsubst %.c,$(BUILD)/%.o,$(wildcard api/*.c)) \
+	$(patsubst %.c,$(BUILD)/%.o,$(wildcard ../../lwip-git/*.c)) \
+	$(patsubst %.c,$(BUILD)/%.o,$(wildcard ../../lwip-glue/*.c)) \
 
 -include build/netif/*.d
 -include build/core/*.d
@@ -27,25 +25,25 @@ LWIP_SRCS = \
 -include ../lwip-git/*.d
 -include ../lwip-glue/*.d
 
-LWIP_INCLUDE = -Ibuild -I$(SDK_PATH)/include -Iinclude -I../../lwip-git -I../../lwip-glue
+LWIP_INCLUDE = -Ibuild -I$(SDK)/include -Iinclude -I../../lwip-git -I../../lwip-glue
 BUILD_FLAGS = -Wall -Wextra -std=c99 -c -Os -g -Wpointer-arith -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
 BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC -DLWIP_BUILD -DUSE_OPTIMIZE_PRINTF
 
-CC=$(TOOLS_PATH)gcc
-AR=$(TOOLS_PATH)ar
+CC=$(TOOLS)gcc
+AR=$(TOOLS)ar
 
-$(BUILD_PATH)/%.h:
+$(BUILD)/%.h:
 	@mkdir -p $(dir $@)
 	@touch $@
 
-$(BUILD_PATH)/%.o: %.c
+$(BUILD)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(BUILD_FLAGS) $(BUILD_DEFINES) $(LWIP_INCLUDE) $< -o $@
 
-$(LWIP_LIB): $(BUILD_PATH)/user_config.h $(LWIP_SRCS)
+$(LWIP_LIB): $(BUILD)/user_config.h $(LWIP_SRCS)
 	$(AR) cru $(LWIP_LIB) $(LWIP_SRCS)
 
 jall: $(LWIP_LIB)
 
 jclean:
-	@rm -rf $(BUILD_PATH) $(LWIP_LIB) $(BUILD_PATH_STUB)
+	@rm -rf $(BUILD) $(LWIP_LIB) $(BUILD_STUB)

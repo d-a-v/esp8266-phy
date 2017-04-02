@@ -1,39 +1,31 @@
-TOOLS_PATH ?= ../esp8266/tools/xtensa-lx106-elf/bin/xtensa-lx106-elf-
-LWIP_LIB ?= liblwip_src.a
-SDK_PATH ?= $(abspath ../esp8266/tools/sdk)
-ESP_LWIP ?= $(SDK_PATH)/lwip.orig
 
-BUILD_PATH = build
+include $(ROOT)/Makefile.common
+
+BUILD = build
 LWIP_SRCS = \
-	$(patsubst %.c,$(BUILD_PATH)/%.o,$(wildcard lwip-esp/*.c))
+	$(patsubst %.c,$(BUILD)/%.o,$(wildcard lwip-esp/*.c))
 
 -include build/lwip-esp/*.d
 
-LWIP_INCLUDE = -Ibuild -I$(SDK_PATH)/include -I$(ESP_LWIP)/include -Ilwip-esp -Ilwip-glue
+LWIP_INCLUDE = -Ibuild -I$(SDK)/include -I$(ESP_LWIP_ORIG)/include -Ilwip-esp -Ilwip-glue
 BUILD_FLAGS = -Wall -Wextra -std=c99 -c -Os -g -Wpointer-arith -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
 BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC -DUSE_OPTIMIZE_PRINTF
 
-CC=$(TOOLS_PATH)gcc
-AR=$(TOOLS_PATH)ar
+CC=$(TOOLS)gcc
+AR=$(TOOLS)ar
 
-$(BUILD_PATH)/%.h:
+$(BUILD)/%.h:
 	@mkdir -p $(dir $@)
 	@touch $@
 
-$(BUILD_PATH)/%.o: %.c
+$(BUILD)/%.o: %.c
 	@mkdir -p $(dir $@)
 	$(CC) $(BUILD_FLAGS) $(BUILD_DEFINES) $(LWIP_INCLUDE) $< -o $@
 
-$(LWIP_LIB): $(BUILD_PATH)/user_config.h $(LWIP_SRCS)
+$(LWIP_LIB): $(BUILD)/user_config.h $(LWIP_SRCS)
 	$(AR) cru $(LWIP_LIB) $(LWIP_SRCS)
 
 all: $(LWIP_LIB)
 
-#install: all
-#	cp -f $(LWIP_LIB) $(SDK_PATH)/lib/$(LWIP_LIB)
-
-#release: all
-#	cp -f $(LWIP_LIB) $(SDK_PATH)/lib/liblwip_gcc.a
-
 clean:
-	@rm -rf $(BUILD_PATH) $(LWIP_LIB)
+	@rm -rf $(BUILD) $(LWIP_LIB)

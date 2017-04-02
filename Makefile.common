@@ -1,0 +1,8 @@
+
+SDK			?= $(ROOT)/..
+TOOLS			?= $(ROOT)/../../xtensa-lx106-elf/bin/xtensa-lx106-elf-
+ESP_LWIP		?= $(SDK)/lwip
+ESP_LWIP_ORIG		?= $(SDK)/lwip.orig
+LWIP_LIB		?= $(ROOT)/liblwip_src.a
+LWIP_LIB_RELEASE	?= $(SDK)/lib/liblwip_gcc.a
+LWIP_LIB_RELEASE_ORIG	?= $(SDK)/lib/liblwip_gcc.a.orig
