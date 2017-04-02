@@ -2,6 +2,8 @@
 #ifndef MYLWIPOPTS_H
 #define MYLWIPOPTS_H
 
+// opt.h version lwip-2.0.3 for esp8266
+
 /**
  * @file
  *
@@ -49,7 +51,6 @@
  * Include user defined options first. Anything not defined in these files
  * will be set to standard values. Override anything you don't like!
  */
-//#include "lwipopts.h"		// this is us
 //#include "lwip/debug.h"	// done at end of this file
 
 /**

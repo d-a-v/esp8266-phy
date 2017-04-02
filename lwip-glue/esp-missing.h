@@ -2,7 +2,7 @@
 #ifndef ESP_MISSING_H
 #define ESP_MISSING_H
 
-// these are guessed
+// these declarations are guessed and used by lwip1.4 from sdk2.0.0
 
 uint32_t r_rand (void);
 void ets_bzero (void*, size_t);

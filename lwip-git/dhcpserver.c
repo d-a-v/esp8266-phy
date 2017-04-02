@@ -1,3 +1,7 @@
+
+// adapted from dhcpserver.c distributed in esp8266 sdk 2.0.0
+// same license may apply
+
 #include "lwip/inet.h"
 #include "lwip/err.h"
 #include "lwip/pbuf.h"
