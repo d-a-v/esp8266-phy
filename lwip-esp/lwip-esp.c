@@ -733,8 +733,13 @@ void netif_set_down (struct netif* netif)
 	uprint(DBG "netif_set_down  ");
 	stub_display_netif(netif);
 	
-	netif->flags &= ~(NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);
-	esp2glue_netif_set_updown(netif->num, 0);
+	// dont set down. some esp8266 (wemos D1 not mini) will:
+	// * esp2glue_netif_set_updown
+	// * restart dhcp-client _without_ netif_set_up.
+	// another one (D1 mini) does not call set_down()
+
+	// netif->flags &= ~(NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);
+	// esp2glue_netif_set_updown(netif->num, 0);
 }
 
 /**
