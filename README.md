@@ -5,19 +5,20 @@ This repo offers an abstraction layer for esp8266 for any other ip
 implementation than the originally provided one (patched lwip-1.4).  The
 original goal is to try and use clean-lwip2 for stability reasons.
 
-# note:
+# Note
 
 * ipv6 not tried yet
-* yes it is more stable (at least for me)
-* not proven to be stable yet
+* tcp it is more stable (lot more)
+* not proven to be rock-stable yet
 
-# tested to work so far:
+# Tested to work so far
 
 * NTPClient
 * WiFiAccessPoint
 * OTA (you'll have to change 1460 to 536 in espota.py)
 
-# Try it now:
+# Try it now
+(makefiles are suited for linux, I have no windows)
 
 ```
 cd <path-to-your>/esp8266
@@ -35,7 +36,7 @@ cd tools/sdk
 git clone https://github.com/d-a-v/esp8266-phy.git
 ```
 
-try it
+build it
 ```
 cd esp8266-phy
 ./get-lwip-git
