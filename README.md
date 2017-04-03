@@ -18,7 +18,7 @@ original goal is to try and use clean-lwip2 for stability reasons.
 * OTA (you'll have to change 1460 to 536 in espota.py)
 
 # Try it now
-(makefiles are suited for linux, I have no windows)
+(makefiles are suited for ~~linux~~unix-like os, I have no windows)
 
 ```
 cd <path-to-your>/esp8266
