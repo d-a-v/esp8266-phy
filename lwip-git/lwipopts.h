@@ -1940,7 +1940,7 @@
  * LWIP_STATS==1: Enable statistics collection in lwip_stats.
  */
 #if !defined LWIP_STATS || defined __DOXYGEN__
-#define LWIP_STATS                      1
+#define LWIP_STATS                      0 // 1
 #endif
 
 #if LWIP_STATS

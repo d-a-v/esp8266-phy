@@ -307,55 +307,6 @@ err_glue_t glue2esp_linkoutput (int netif_idx, void* ref2save, void* data, size_
 	return esp2glue_err(err);
 }
 
-#if 0
-
-void blobs_getinfo (void)
-{
-	struct netif* test_netif_sta = eagle_lwip_getif(STATION_IF);
-	struct netif* test_netif_ap = eagle_lwip_getif(SOFTAP_IF);
-
-	if (test_netif_sta)
-	{
-		uassert(!netif_sta || test_netif_sta == netif_sta);
-		uassert(test_netif_sta->input == ethernet_input);
-		uassert(test_netif_sta->output == etharp_output);
-	}
-	else uprint(DBG "sta not initialized\n");
-	
-	if (test_netif_ap)
-	{
-		uassert(!netif_ap || test_netif_ap == netif_ap);
-		uassert(test_netif_ap->input == ethernet_input);
-		uassert(test_netif_ap->output == etharp_output);
-	}
-	else uprint(DBG "ap not initialized\n");
-}
-
-
-// some checks + give netif index
-static int esp_netif_update (struct netif* netif)
-{
-	uprint("useless esp_netif_update\n");
-
-	blobs_getinfo();
-
-	int netif_idx = (netif == netif_sta)? STATION_IF: SOFTAP_IF;
-
-	esp2glue_netif_updated(
-		netif_idx,
-		netif->ip_addr.addr,
-		netif->netmask.addr,
-		netif->gw.addr,
-		esp2glue_netif_flags(netif->flags),
-		netif->hwaddr_len,
-		netif->hwaddr
-		/*netif->state*/);
-	
-	return netif_idx;
-}
-
-#endif
-
 int esp_guess_netif_idx (struct netif* netif)
 {
 	struct netif* test_netif_sta = eagle_lwip_getif(STATION_IF);
@@ -440,7 +391,7 @@ err_t ethernet_input (struct pbuf* p, struct netif* netif)
 	
 	uassert(p->tot_len == p->len && p->ref == 1);
 	
-#if UDEBUG
+#if UDUMP
 	// dump packets for me (direct or broadcast)
 	if (   memcmp((const char*)p->payload, netif->hwaddr, 6) == 0
 	    || memcmp((const char*)p->payload, ethbroadcast.addr, 6) == 0)
@@ -674,8 +625,10 @@ void netif_remove (struct netif* netif)
 	uprint(DBG "trying to remove netif ");
 	stub_display_netif(netif);
 	
-	esp2glue_netif_set_updown(netif->num, 0);
-	netif->flags &= ~NETIF_FLAG_LINK_UP;
+	// don't, see netif_set_down()
+	//esp2glue_netif_set_updown(netif->num, 0);
+	//netif->flags &= ~NETIF_FLAG_LINK_UP;
+	(void)netif;
 }
 
 /**
@@ -740,6 +693,7 @@ void netif_set_down (struct netif* netif)
 
 	// netif->flags &= ~(NETIF_FLAG_UP |  NETIF_FLAG_LINK_UP);
 	// esp2glue_netif_set_updown(netif->num, 0);
+	(void)netif;
 }
 
 /**
@@ -818,7 +772,7 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 		p->eb = NULL;
 		p->ref = 1;
 		p->flags = 0;
-		uprint(DBG "pbuf_alloc-> %p %dB type=%d\n", p, alloclen, type);
+		uprint(DBG "pbuf_alloc(RAW/RAM)-> %p %dB type=%d\n", p, alloclen, type);
 		return p;
 	}
 	
@@ -836,7 +790,7 @@ struct pbuf* pbuf_alloc (pbuf_layer layer, u16_t length, pbuf_type type)
 		p->eb = NULL;
 		p->ref = 1;
 		p->flags = 0;
-		uprint(DBG "pbuf_alloc-> %p %dB type=%d\n", p, alloclen, type);
+		uprint(DBG "pbuf_alloc(RAW/REF)-> %p %dB type=%d\n", p, alloclen, type);
 		return p;
 	}
 
@@ -891,13 +845,11 @@ u8_t pbuf_free (struct pbuf *p)
 	#endif
 	
 	uassert(p->ref == 1);
-	if (p->eb)
-		system_pp_recycle_rx_pkt(p->eb);
 
 	if (p->type == PBUF_CUSTOM_TYPE_POOLED)
 	{
 		// allocated by glue for sending packets
-
+		uassert(!p->eb);
 		// retrieve glue structure to be freed
 		struct pbuf_wrapper* pw = (struct pbuf_wrapper*)p;
 		// pw->ref2save is the glue structure to release
@@ -917,6 +869,8 @@ u8_t pbuf_free (struct pbuf *p)
 	      //|| p->type == PBUF_ESF_RX
 	       ))
 	{
+		if (p->eb)
+			system_pp_recycle_rx_pkt(p->eb);
 		// allocated by blobs for received packets
 		mem_free(p);
 		return 1;
