@@ -1,0 +1,44 @@
+
+files="
+esp8266/libraries/ESP8266WiFi/src/ESP8266WiFiGeneric.cpp
+esp8266/libraries/ESP8266WiFi/src/ESP8266WiFiSTA.cpp
+esp8266/libraries/ESP8266WiFi/src/WiFiClient.cpp
+esp8266/libraries/ESP8266WiFi/src/include/UdpContext.h
+
+esp8266/tools/sdk/lib/liblwip_gcc.a
+esp8266/tools/sdk/lib/liblwip_gcc.a.orig
+esp8266/tools/sdk/lwip/include
+esp8266/tools/sdk/lwip.orig/include
+"
+
+now=$(date +%Y%m%d-%H:%M:%S)
+archive="esp8266-lwip2-$now".zip
+
+set -e
+
+rm -f $archive
+pwd=$(pwd)
+cd ../../../../esp8266/..
+
+(
+cat << EOF 
+
+Compiled version of:
+	https://github.com/d-a-v/esp8266-phy.git
+with lwip2 branch from clone of esp8266/Arduino:
+	https://github.com/d-a-v/Arduino/tree/lwip2
+as of $now.
+
+This is supposed to be unarchived from the same directory where
+the directory esp8266 exists,
+which is the one from from github's esp8266/arduino living in
+<arduino root dir>/hardware/esp8266com .
+
+It is OK to overwrite existing files / directories.
+Original versions (.orig dir/files) are provided
+if you want to revert things back without reinstalling.
+
+
+.
+EOF
+) | zip -zr9 --exclude="*~" $pwd/$archive $files
