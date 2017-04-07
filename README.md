@@ -1,9 +1,9 @@
 
 # esp8266-phy
 
-This repo offers an abstraction layer for esp8266 for any other ip
-implementation than the originally provided one (patched lwip-1.4).  The
-original goal is to try and use clean-lwip2 for stability reasons.
+This repo offers an abstraction layer for esp8266 (nonos-sdk-2.0.0) for any
+other ip implementation than the originally provided one (patched lwip-1.4). 
+The original goal is to try and use clean-lwip2 for stability reasons.
 
 # Note
 
@@ -17,8 +17,8 @@ original goal is to try and use clean-lwip2 for stability reasons.
 * WiFiAccessPoint
 * OTA (you'll have to change 1460 to 536 in espota.py)
 
-# Try it now
-(makefiles are suited for ~~linux~~unix-like os, I have no windows)
+# Build it now
+(makefiles are working with linux/osx, I have no windows)
 
 ```
 cd <path-to-your>/esp8266
@@ -49,3 +49,10 @@ revert lwip back to original one (for git operation on esp8266/Arduino)
 ```
 make revert
 ```
+
+# A blob for a blob
+
+A binary archive to unzip on top of your installed esp8266/Arduino is
+available.
+https://drive.google.com/open?id=0BxSrXa09wHRlNnRYOWU1Rng1enc
+(esp8266-lwip2-20170406-13:17:47.zip)

@@ -1,1 +1,3 @@
-git clone https://git.savannah.nongnu.org/git/lwip.git lwip-git-src
+test -d lwip-git-src && \
+	{ cd lwip-git-src; git pull; } || \
+	git clone https://git.savannah.nongnu.org/git/lwip.git lwip-git-src

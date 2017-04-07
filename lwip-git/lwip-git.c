@@ -374,57 +374,6 @@ void esp2glue_netif_set_addr (int netif_idx, uint32_t ip, uint32_t mask, uint32_
 void esp2glue_lwip_init (void)
 {
 	lwip_init();
-
-#if 0
-	// fill output, linkoutput, name
-	// all others shall be overwritten by netif_add below
-	memset(&netif_git[0], 0, sizeof(netif_git[0]));
-	memset(&netif_git[1], 0, sizeof(netif_git[1]));
-	//setup_netif(STATION_IF);
-	//setup_netif(SOFTAP_IF);
-#endif
-#if 0
-	// input is directly called by esp to glue
-	ip4_addr_t zero = { 0 };
-	netif_add(&netif_git[STATION_IF], &zero, &zero, &zero, /*state*/NULL, netif_init_sta, /*useless input*/NULL);
-	netif_add(&netif_git[SOFTAP_IF],  &zero, &zero, &zero, /*state*/NULL, netif_init_ap,  /*useless input*/NULL);
-#endif
-}
-
-void esp2glue_netif_updated (int netif_idx, uint32_t ip, uint32_t mask, uint32_t gw, glue_netif_flags_t flags, uint32_t hwlen, const uint8_t* hw /*, void* state*/)
-{
-
-//XXX blorgl here. netif can be updated from both side. two-way update to setup
-
-	struct netif* netif = &netif_git[netif_idx];
-
-	if (!netif->ip_addr.addr)
-	{
-		netif->ip_addr.addr = ip;
-		netif->netmask.addr = mask;
-		netif->gw.addr = gw;
-		//netif->state = state; // do not overwrite, dhcps uses it as a udp_pcb
-	}
-
-	netif->flags |= glue2git_netif_flags(flags);
-	// this was not done in old lwip and is needed for dhcp client
-	netif->flags |= NETIF_FLAG_UP;
-
-	if (netif->hwaddr_len != 6)
-	{
-		uassert(hwlen == 0 || hwlen == 6);
-		netif->hwaddr_len = hwlen;
-		if (hwlen == 6)
-		{
-			os_memcpy(netif->hwaddr, hw, hwlen);
-			sprintf(hostname, "esp8266_%02x%02x%02x%02x%02x%02x", hw[0], hw[1], hw[2], hw[3], hw[4], hw[5]);
-		}
-		else
-			hostname[0] = 0;
-	}
-	
-	uprint(DBG "netif updated: ");
-	new_display_netif(netif);
 }
 
 void esp2glue_alloc_for_recv (size_t len, void** pbuf, void** data)
