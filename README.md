@@ -8,7 +8,7 @@ The original goal is to try and use clean-lwip2 for stability reasons.
 # Note
 
 * ipv6 not tried yet
-* tcp it is more stable (lot more)
+* tcp it is more stable
 * not proven to be rock-stable yet
 
 # Tested to work so far
@@ -18,7 +18,7 @@ The original goal is to try and use clean-lwip2 for stability reasons.
 * OTA (you'll have to change 1460 to 536 in espota.py)
 
 # Build it now
-(makefiles are working with linux/osx, I have no windows)
+(makefiles are working with linux/osx, see below for windows)
 
 ```
 cd <path-to-your>/esp8266
@@ -36,10 +36,14 @@ cd tools/sdk
 git clone https://github.com/d-a-v/esp8266-phy.git
 ```
 
+optionnally tune TCP configuration in esp8266-phy/lwip-git/lwipopts.h
+
 build it
 ```
 cd esp8266-phy
+# get or update latest git version of lwip
 ./get-lwip-git
+# compile and install lwip
 make install
 ```
 
@@ -56,3 +60,18 @@ A binary archive to unzip on top of your installed esp8266/Arduino is
 available.
 https://drive.google.com/open?id=0BxSrXa09wHRlNnRYOWU1Rng1enc
 (esp8266-lwip2-20170406-13:17:47.zip)
+
+This is especially useful for windows users who want to try. 
+
+# about OTA
+
+tools/espota.py sends 1460 bytes UDP packets (line 156: f.read(1460))
+What would be great would be TCP instead of UDP. In the meantime,
+either change 1460 to your MSS value, or use 1460 as MSS value.
+Remember the MSS footprint: 4*MSS bytes in RAM per tcp connection.
+The lowest recommanded value is 536 which is the default here.
+MSS is tunable in make command line:
+```
+make clean
+make TCP_MSS=1460 install
+```
