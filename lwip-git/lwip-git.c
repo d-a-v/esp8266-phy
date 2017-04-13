@@ -27,6 +27,8 @@ author: d. gauchard
 
 */
 
+#include "glue.h"
+#include "lwip-helper.h"
 
 #include "lwipopts.h"
 #include "lwip/err.h"
@@ -37,8 +39,6 @@ author: d. gauchard
 #include "netif/ethernet.h"
 #include "lwip/app/dhcpserver.h"
 
-#include "glue.h"
-#include "lwip-helper.h"
 
 #define DBG "GLUE: "
 
@@ -284,7 +284,11 @@ static void netif_sta_status_callback (struct netif* netif)
 	if (netif->flags & NETIF_FLAG_LINK_UP)
 	{
 		// tell ESP that link is up
-		glue2esp_ifup(netif == netif_sta? STATION_IF: SOFTAP_IF, netif->ip_addr.addr, netif->netmask.addr, netif->gw.addr);
+		glue2esp_ifup(netif == netif_sta? STATION_IF: SOFTAP_IF,
+			// netif->below are always ipv4
+			ip_2_ip4(&netif->ip_addr)->addr,
+			ip_2_ip4(&netif->netmask)->addr,
+			ip_2_ip4(&netif->gw)->addr);
 
 		if (netif == netif_sta)
 			// this is our default route

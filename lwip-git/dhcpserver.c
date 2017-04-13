@@ -30,8 +30,8 @@ static const char mem_debug_file[] ICACHE_RODATA_ATTR = __FILE__;
 static const uint32 magic_cookie ICACHE_RODATA_ATTR = 0x63538263;
 static struct udp_pcb *pcb_dhcps = NULL;
 static ip_addr_t broadcast_dhcps;
-static struct ip_addr server_address;
-static struct ip_addr client_address;//added
+static ip_addr_v4_t server_address;
+static struct ip_addr_v4 client_address;//added
 
 static struct dhcps_lease dhcps_lease;
 //static bool dhcps_lease_flag = true;
@@ -41,8 +41,8 @@ static bool renew = false;
 #define DHCPS_LEASE_TIME_DEF    (120)
 uint32 dhcps_lease_time = DHCPS_LEASE_TIME_DEF;  //minute
 
-void wifi_softap_dhcps_client_leave(u8 *bssid, struct ip_addr *ip,bool force);
-uint32 wifi_softap_dhcps_client_update(u8 *bssid, struct ip_addr *ip);
+void wifi_softap_dhcps_client_leave(u8 *bssid, struct ip_addr_v4 *ip,bool force);
+uint32 wifi_softap_dhcps_client_update(u8 *bssid, struct ip_addr_v4 *ip);
 
 /******************************************************************************
  * FunctionName : node_insert_to_list
@@ -141,14 +141,13 @@ static uint8_t* ICACHE_FLASH_ATTR add_msg_type(uint8_t *optptr, uint8_t type)
 ///////////////////////////////////////////////////////////////////////////////////
 static uint8_t* ICACHE_FLASH_ATTR add_offer_options(uint8_t *optptr)
 {
-        struct ip_addr ipadd;
-
-        ipadd.addr = *( (uint32_t *) &server_address);
+//        struct ip_addr_v4 ipadd;
+//        ipadd.addr = *( (uint32_t *) &server_address);
 
         struct ip_info if_ip;
         os_bzero(&if_ip, sizeof(struct ip_info));
         wifi_get_ip_info(SOFTAP_IF, &if_ip);
-    
+        
         *optptr++ = DHCP_OPTION_SUBNET_MASK;
         *optptr++ = 4;
         *optptr++ = ip4_addr1( &if_ip.netmask);
@@ -165,10 +164,10 @@ static uint8_t* ICACHE_FLASH_ATTR add_offer_options(uint8_t *optptr)
 
         *optptr++ = DHCP_OPTION_SERVER_ID;
         *optptr++ = 4;  
-        *optptr++ = ip4_addr1( &ipadd);
-        *optptr++ = ip4_addr2( &ipadd);
-        *optptr++ = ip4_addr3( &ipadd);
-        *optptr++ = ip4_addr4( &ipadd);
+        *optptr++ = ip4_addr1( &server_address);
+        *optptr++ = ip4_addr2( &server_address);
+        *optptr++ = ip4_addr3( &server_address);
+        *optptr++ = ip4_addr4( &server_address);
 
         if (dhcps_router_enabled(offer)){
             *optptr++ = DHCP_OPTION_ROUTER;
@@ -182,25 +181,27 @@ static uint8_t* ICACHE_FLASH_ATTR add_offer_options(uint8_t *optptr)
 #ifdef USE_DNS
         *optptr++ = DHCP_OPTION_DNS_SERVER;
         *optptr++ = 4;
-        *optptr++ = ip4_addr1( &ipadd);
-        *optptr++ = ip4_addr2( &ipadd);
-        *optptr++ = ip4_addr3( &ipadd);
-        *optptr++ = ip4_addr4( &ipadd);
+        *optptr++ = ip4_addr1( &server_address);
+        *optptr++ = ip4_addr2( &server_address);
+        *optptr++ = ip4_addr3( &server_address);
+        *optptr++ = ip4_addr4( &server_address);
 #endif
 
 #ifdef CLASS_B_NET
+#error
         *optptr++ = DHCP_OPTION_BROADCAST_ADDRESS;
         *optptr++ = 4;  
-        *optptr++ = ip4_addr1( &ipadd);
+        *optptr++ = ip4_addr1( &server_address);
         *optptr++ = 255;
         *optptr++ = 255;
         *optptr++ = 255;
 #else
+#warning can do better than that :)
         *optptr++ = DHCP_OPTION_BROADCAST_ADDRESS;
         *optptr++ = 4;  
-        *optptr++ = ip4_addr1( &ipadd);
-        *optptr++ = ip4_addr2( &ipadd);
-        *optptr++ = ip4_addr3( &ipadd);
+        *optptr++ = ip4_addr1( &server_address);
+        *optptr++ = ip4_addr2( &server_address);
+        *optptr++ = ip4_addr3( &server_address);
         *optptr++ = 255;
 #endif
 
@@ -249,7 +250,7 @@ static uint8_t* ICACHE_FLASH_ATTR add_end(uint8_t *optptr)
 ///////////////////////////////////////////////////////////////////////////////////
 static void ICACHE_FLASH_ATTR create_msg(struct dhcps_msg *m)
 {
-        struct ip_addr client;
+        struct ip_addr_v4 client;
 
         client.addr = client_address.addr;
 
@@ -465,7 +466,7 @@ static void ICACHE_FLASH_ATTR send_ack(struct dhcps_msg *m)
 ///////////////////////////////////////////////////////////////////////////////////
 static uint8_t ICACHE_FLASH_ATTR parse_options(uint8_t *optptr, sint16_t len)
 {
-        struct ip_addr client;
+        struct ip_addr_v4 client;
         bool is_dhcp_parse_end = false;
         struct dhcps_state s;
 
@@ -561,7 +562,7 @@ static sint16_t ICACHE_FLASH_ATTR parse_msg(struct dhcps_msg *m, u16_t len)
     if(os_memcmp((char *)m->options,
             &magic_cookie,
             sizeof(magic_cookie)) == 0){
-        struct ip_addr ip;
+        struct ip_addr_v4 ip;
         os_memcpy(&ip.addr,m->ciaddr,sizeof(ip.addr));
         client_address.addr = wifi_softap_dhcps_client_update(m->chaddr,&ip);
 
@@ -753,11 +754,14 @@ void ICACHE_FLASH_ATTR dhcps_start(struct ip_info *info)
 //  wrong: answer will go to sta  IP4_ADDR(&broadcast_dhcps, 255, 255, 255, 255);
 //  good: going to ap IP4_ADDR(&broadcast_dhcps, 192, 168, 4, 255);
 //  semi proper way:
-    broadcast_dhcps = apnetif->ip_addr;
-    broadcast_dhcps.addr &= apnetif->netmask.addr;
-    broadcast_dhcps.addr |= ~apnetif->netmask.addr;
+    IP_SET_TYPE_VAL(broadcast_dhcps, IPADDR_TYPE_V4);
+    ip_2_ip4(&broadcast_dhcps)->addr =   ip_2_ip4(&apnetif->ip_addr)->addr;
+    ip_2_ip4(&broadcast_dhcps)->addr &=  ip_2_ip4(&apnetif->netmask)->addr;
+    ip_2_ip4(&broadcast_dhcps)->addr |= ~ip_2_ip4(&apnetif->netmask)->addr;
 
     server_address = info->ip;
+//    OLDv4_2_NEW(&info->ip, &server_address);
+
     wifi_softap_init_dhcps_lease(server_address.addr);
 
     udp_bind(pcb_dhcps, IP_ADDR_ANY, DHCPS_SERVER_PORT);
@@ -791,7 +795,7 @@ void ICACHE_FLASH_ATTR dhcps_stop(void)
     list_node *pnode = NULL;
     list_node *pback_node = NULL;
     struct dhcps_pool* dhcp_node = NULL;
-    struct ip_addr ip_zero;
+    struct ip_addr_v4 ip_zero;
 
     os_memset(&ip_zero,0x0,sizeof(ip_zero));
     pnode = plist;
@@ -1021,7 +1025,7 @@ uint32 ICACHE_FLASH_ATTR wifi_softap_get_dhcps_lease_time(void) // minute
     return dhcps_lease_time;
 }
 
-void ICACHE_FLASH_ATTR wifi_softap_dhcps_client_leave(u8 *bssid, struct ip_addr *ip,bool force)
+void ICACHE_FLASH_ATTR wifi_softap_dhcps_client_leave(u8 *bssid, struct ip_addr_v4 *ip,bool force)
 {
     struct dhcps_pool *pdhcps_pool = NULL;
     list_node *pback_node = NULL;
@@ -1049,7 +1053,7 @@ void ICACHE_FLASH_ATTR wifi_softap_dhcps_client_leave(u8 *bssid, struct ip_addr 
                     pdhcps_pool->state = DHCPS_STATE_OFFLINE;
                 }
 
-                struct ip_addr ip_zero;
+                struct ip_addr_v4 ip_zero;
                 os_memset(&ip_zero,0x0,sizeof(ip_zero));
                 wifi_softap_set_station_info(bssid, &ip_zero);
                 break;
@@ -1058,7 +1062,7 @@ void ICACHE_FLASH_ATTR wifi_softap_dhcps_client_leave(u8 *bssid, struct ip_addr 
     }
 }
 
-uint32 ICACHE_FLASH_ATTR wifi_softap_dhcps_client_update(u8 *bssid, struct ip_addr *ip)
+uint32 ICACHE_FLASH_ATTR wifi_softap_dhcps_client_update(u8 *bssid, struct ip_addr_v4 *ip)
 {
     struct dhcps_pool *pdhcps_pool = NULL;
     list_node *pback_node = NULL;

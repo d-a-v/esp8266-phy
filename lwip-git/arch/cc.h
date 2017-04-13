@@ -34,21 +34,6 @@ author: d. gauchard
 
 #include "stdint.h"
 
-#ifdef LWIP_BUILD
-// define LWIP_BUILD only when building LWIP
-// otherwise include files below would conflict
-// with standard headers like atoi()
-#include "ets_sys.h"
-#include "osapi.h"
-#include "esp-missing.h"
-#endif
-#include "mem.h" // useful for os_malloc used in esp-arduino's mDNS
-
-typedef int sys_prot_t;	// not really used
-#define SYS_ARCH_DECL_PROTECT(lev)
-#define SYS_ARCH_PROTECT(lev) os_intr_lock()
-#define SYS_ARCH_UNPROTECT(lev) os_intr_unlock()
-
 ///////////////////////////////
 //// DEBUG
 #if 0 // debug 1:on or 0
@@ -71,15 +56,24 @@ extern int os_printf_plus(const char * format, ...) __attribute__ ((format (prin
 #define sys_now millis		// arduino wire millis() definition returns 32 bits like sys_now() does
 #define LWIP_RAND r_rand	// old lwip uses this useful undocumented function
 
-// ip_addr / ip_info: do not exist in lwip2 (only in lwip1.4)
-struct ip_addr {
-  uint32_t addr;
-};
-struct ip_info {
-    struct ip_addr ip;
-    struct ip_addr netmask;
-    struct ip_addr gw;
-};
+///////////////////////////////
+//// 
+
+#ifdef LWIP_BUILD
+// define LWIP_BUILD only when building LWIP
+// otherwise include files below would conflict
+// with standard headers like atoi()
+#include "ets_sys.h"
+#include "osapi.h"
+#include "user_interface.h"
+#include "esp-missing.h"
+#endif
+#include "mem.h" // useful for os_malloc used in esp-arduino's mDNS
+
+typedef int sys_prot_t;	// not really used
+#define SYS_ARCH_DECL_PROTECT(lev)
+#define SYS_ARCH_PROTECT(lev) os_intr_lock()
+#define SYS_ARCH_UNPROTECT(lev) os_intr_unlock()
 
 ///////////////////////////////
 //// PROVIDED TO USER
