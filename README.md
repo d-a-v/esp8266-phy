@@ -65,13 +65,17 @@ This is especially useful for windows users who want to try.
 
 # about OTA
 
-tools/espota.py sends 1460 bytes UDP packets (line 156: f.read(1460))
-What would be great would be TCP instead of UDP. In the meantime,
-either change 1460 to your MSS value, or use 1460 as MSS value.
+Although it should work with OTA over http, it won't with arduino IDE / espota.py.
+
+In the meantime, either change 1460 to your MSS value (tools/espota.py: line 156: f.read(1460)),
+
+or use 1460 as MSS value (lwip-git/lwipopts.h).
+
 Remember the MSS footprint: 4*MSS bytes in RAM per tcp connection.
 The lowest recommanded value is 536 which is the default here.
-MSS is tunable in make command line:
-```
-make clean
-make TCP_MSS=1460 install
-```
+
+# some details about makefiles
+
+Makefiles copy original libfile into libfile.orig, moves lwip/ into
+lwip.orig/ then symlink both libfile and lwip/ to the new ones.  'make
+revert' restores original stuff. Check in tools/sdk/ .
