@@ -4,7 +4,7 @@ include $(ROOT)/Makefile.common
 
 all clean: prepare
 	make -f Makefile.lwip-esp ROOT=$(ROOT) $@
-	make -f Makefile.lwip-git ROOT=$(ROOT) TCP_MSS=$(TCP_MSS) $@
+	make -f Makefile.lwip-git ROOT=$(ROOT) $@
 
 prepare:
 	@# rename original lwip directory -> lwip.orig

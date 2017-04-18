@@ -4,7 +4,7 @@
 include $(ROOT)/Makefile.common
 
 all clean:
-	cd lwip-git-src/src && $(MAKE) -f $(ROOT)/../../Makefile.lwip-git ROOT=$(ROOT)/../.. TCP_MSS=$(TCP_MSS) j$@
+	cd lwip-git-src/src && $(MAKE) -f $(ROOT)/../../Makefile.lwip-git ROOT=$(ROOT)/../.. j$@
 
 BUILD_STUB = ../lwip-git ../lwip-glue
 BUILD = build
@@ -27,7 +27,7 @@ LWIP_SRCS = \
 
 LWIP_INCLUDE = -Ibuild -I$(SDK)/include -Iinclude -I../../lwip-git -I../../lwip-glue
 BUILD_FLAGS = -Wall -Wextra -std=c99 -c -Os -g -Wpointer-arith -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
-BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC -DLWIP_BUILD -DUSE_OPTIMIZE_PRINTF -DTCP_MSS=$(TCP_MSS)
+BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC -DLWIP_BUILD -DUSE_OPTIMIZE_PRINTF
 
 CC=$(TOOLS)gcc
 AR=$(TOOLS)ar
