@@ -11,9 +11,6 @@ LWIP_INCLUDE = -Ibuild -I$(SDK)/include -I$(ESP_LWIP_ORIG)/include -Ilwip-esp -I
 BUILD_FLAGS = -Wall -Wextra -std=c99 -c -Os -g -Wpointer-arith -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals -falign-functions=4 -MMD -std=gnu99 -ffunction-sections -fdata-sections
 BUILD_DEFINES = -D__ets__ -DICACHE_FLASH -U__STRICT_ANSI__ -DLWIP_OPEN_SRC -DUSE_OPTIMIZE_PRINTF
 
-CC=$(TOOLS)gcc
-AR=$(TOOLS)ar
-
 $(BUILD)/%.h:
 	@mkdir -p $(dir $@)
 	@touch $@
