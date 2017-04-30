@@ -24,12 +24,6 @@ The original goal is to try and use clean-lwip2 for stability reasons.
 cd <path-to-your>/esp8266
 ```
 
-pull minimalist patch for compiling with lwip2 headers
-```
-git remote add -t lwip2 lwip2patch https://github.com/d-a-v/Arduino.git
-git pull lwip2patch lwip2
-```
-
 get abstraction layer
 ```
 cd tools/sdk
