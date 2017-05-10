@@ -1,4 +1,9 @@
 
+This is obsoleted by [this arduino/esp8266 PR](https://github.com/esp8266/Arduino/pull/3206)
+
+(keeping for reference)
+
+
 # esp8266-phy
 
 This repo offers an abstraction layer for esp8266 (nonos-sdk-2.0.0) for any
