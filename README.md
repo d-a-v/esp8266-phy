@@ -1,7 +1,9 @@
 
-This is obsoleted by [this arduino/esp8266 PR](https://github.com/esp8266/Arduino/pull/3206)
+Keeping for reference
 
-(keeping for reference)
+~~This is obsoleted by [this arduino/esp8266 PR](https://github.com/esp8266/Arduino/pull/3206)~~
+
+This is obsoleted by [d-a-v/esp82xx-nonos-linklayer](https://github.com/d-a-v/esp82xx-nonos-linklayer)
 
 
 # esp8266-phy
